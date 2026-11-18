@@ -1,0 +1,2289 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <title>抗战烽火路 · 滇缅公路（大理段）3D 交互行路书</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <!-- 3D 沙盘舞台 -->
+    <div id="scene-wrap">
+      <div id="webgl-container"></div>
+      <div id="label-layer"></div>
+    </div>
+
+    <!-- 顶部控制栏 -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-badge">3D 沙盘路书</span>
+        <div>
+          <h1>抗战烽火路 · 滇缅公路 3D 考察路书</h1>
+          <div class="brand-sub">基于 Google Maps 实测坐标 · 滇缅公路实地考察三段路线图（下关→保山→腾冲→畹町）× GPS与人脑注意点</div>
+        </div>
+      </div>
+
+      <div class="toolbar-groups">
+        <div class="tool-group" aria-label="路线图层切换">
+          <span class="tool-label">图层</span>
+          <button type="button" class="pill-btn active" data-layer="expedition">
+            <span class="swatch" style="background:#ef4444;"></span>考察三段路线
+          </button>
+          <button type="button" class="pill-btn active" data-layer="modern">
+            <span class="swatch" style="background:#22c55e;"></span>大理段路书
+          </button>
+          <button type="button" class="pill-btn active" data-layer="historical">
+            <span class="swatch" style="background:#f59e0b;"></span>1938历史原线
+          </button>
+          <button type="button" class="pill-btn active" data-layer="heritage">
+            <span class="swatch" style="background:#38bdf8;"></span>古道/炮台/支线
+          </button>
+          <button type="button" class="pill-btn active" data-layer="traps">
+            <span class="swatch" style="background:#fb7185;"></span>纯GPS误导陷阱
+          </button>
+        </div>
+
+        <div class="tool-group">
+          <span class="tool-label">底图</span>
+          <select id="basemap-select" class="map-select" title="切换地形贴图源">
+            <option value="google-sat" selected>Google 卫星遥感 (lyrs=s)</option>
+            <option value="google-hybrid">Google 卫星+路网标注 (lyrs=y)</option>
+            <option value="google-terrain">Google 地形图 (lyrs=p)</option>
+            <option value="procedural">离线等高线地貌沙盘</option>
+          </select>
+          <span id="basemap-status" class="map-status-chip">加载地形中…</span>
+        </div>
+
+        <div class="tool-group">
+          <label class="range-wrap" title="调整三维山谷垂直拉伸倍率">
+            <span>地形夸大</span>
+            <input id="elev-scale" type="range" min="1.2" max="4.2" step="0.2" value="2.6" />
+            <span id="elev-scale-val">2.6x</span>
+          </label>
+          <button type="button" id="btn-reset-cam" class="icon-btn" title="恢复全景鸟瞰视角">全景复位</button>
+          <button type="button" id="btn-open-intro" class="icon-btn" style="border-color:rgba(56,189,248,0.5);color:#7dd3fc;">▶ 播放开篇解说</button>
+          <button type="button" id="btn-macro-modal" class="icon-btn" style="border-color:rgba(245,158,11,0.45);color:#fde68a;">史实与五大贴士</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 右上角「实地考察三段沙盘导览」快捷视角面板 -->
+    <aside id="exp-tour-bar" class="exp-tour-bar" aria-label="实地考察三段沙盘导览">
+      <div class="exp-tour-title">
+        <span>🧭 滇缅公路考察三段 3D 导览</span>
+      </div>
+      <button type="button" id="btn-exp-all" class="exp-tour-btn active" data-exp="all">
+        <span class="exp-tag">🌏 三段全线总览</span>
+        <span class="exp-time">下关→畹町</span>
+      </button>
+      <button type="button" id="btn-exp-1" class="exp-tour-btn" data-exp="exp1">
+        <span class="exp-tag"><span class="swatch" style="background:#ef4444;"></span>1. 范卫平：下关-保山</span>
+        <span class="exp-time">11.17-19</span>
+      </button>
+      <button type="button" id="btn-exp-2" class="exp-tour-btn" data-exp="exp2">
+        <span class="exp-tag"><span class="swatch" style="background:#3b82f6;"></span>2. 李筠/许小亮：保山-腾冲</span>
+        <span class="exp-time">2026.11.20-24</span>
+      </button>
+      <button type="button" id="btn-exp-3" class="exp-tour-btn" data-exp="exp3">
+        <span class="exp-tag"><span class="swatch" style="background:#10b981;"></span>3. 范卫平：腾冲-畹町</span>
+        <span class="exp-time">11.25-27</span>
+      </button>
+      <button type="button" id="btn-exp-dali" class="exp-tour-btn" data-exp="dali">
+        <span class="exp-tag">🔍 大理段 22 点精读</span>
+        <span class="exp-time">局部特写</span>
+      </button>
+    </aside>
+
+    <!-- 左侧收起时的展开按钮 -->
+    <button type="button" id="btn-open-left" class="drawer-toggle-btn" style="display:none;">☰ 路书节点目录 (30)</button>
+
+    <!-- 左侧路书节点与行程筛选目录 -->
+    <aside id="left-drawer" class="left-drawer">
+      <div class="left-head">
+        <span class="left-head-title">全线 30 节点（点击飞跃定位）</span>
+        <button type="button" id="btn-close-left" class="icon-btn">收起</button>
+      </div>
+      <div class="filter-tabs" id="filter-tabs">
+        <button type="button" class="filter-chip active" data-filter="all">全部 30</button>
+        <button type="button" class="filter-chip" data-filter="exp1">① 下关-保山</button>
+        <button type="button" class="filter-chip" data-filter="exp2">② 保山-腾冲</button>
+        <button type="button" class="filter-chip" data-filter="exp3">③ 腾冲-畹町</button>
+        <button type="button" class="filter-chip" data-filter="dali">大理段22点</button>
+        <button type="button" class="filter-chip" data-filter="caution">⚠️ GPS易错</button>
+      </div>
+      <div id="wp-list" class="wp-list"></div>
+    </aside>
+
+    <!-- 右侧点击节点深度详情抽屉 -->
+    <aside id="right-drawer" class="right-drawer hidden" aria-live="polite">
+      <div class="detail-head">
+        <div>
+          <div id="detail-kicker" class="detail-kicker"></div>
+          <h2 id="detail-title" class="detail-title"></h2>
+        </div>
+        <button type="button" id="btn-close-detail" class="icon-btn">✕ 关闭</button>
+      </div>
+      <div id="detail-body" class="detail-body"></div>
+      <div class="detail-foot">
+        <button type="button" id="btn-prev-wp" class="icon-btn">← 上一站</button>
+        <span id="detail-progress" style="font-size:11px;color:var(--ink-3);"></span>
+        <button type="button" id="btn-next-wp" class="icon-btn">下一站 →</button>
+      </div>
+    </aside>
+
+    <!-- 底部领航双核 HUD + 海拔剖面图播放器 -->
+    <section class="bottom-dock">
+      <div class="hud-strip" id="hud-strip">
+        <div class="hud-cell">
+          <span class="hud-tag gps">📡 今日 GPS 分段指令</span>
+          <span class="hud-text" id="hud-gps-text">点击场景中任意节点，或在下方播放 3D 模拟自驾领航</span>
+        </div>
+        <div class="hud-cell">
+          <span class="hud-tag human">🧠 人脑现场注意点（文章提炼）</span>
+          <span class="hud-text" id="hud-human-text">切勿高速优先！在平坡桥头、黄连铺、北斗乡、大栗树村等关键节点必须人工接管识别老路</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <button type="button" id="btn-copy-nav" class="hud-nav-pill" title="复制当前节点导航词">📋 锁定：<span id="hud-nav-kw">漾濞高铁站</span></button>
+          <a id="hud-gmap-link" class="hud-nav-pill" href="https://www.google.com/maps/@25.586,100.224,14z/data=!3m1!1e3" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">🌍 Google Maps</a>
+        </div>
+      </div>
+
+      <div class="profile-bar">
+        <div class="drive-controls">
+          <button type="button" id="btn-drive-play" class="play-btn">▶ 3D 模拟行车</button>
+          <button type="button" id="btn-drive-scope" class="icon-btn" title="切换三段考察全线或大理段精细剖面">路线: 三段全线(685km)</button>
+          <button type="button" id="btn-drive-speed" class="icon-btn" title="切换行驶速度">1x</button>
+          <button type="button" id="btn-drive-follow" class="icon-btn" title="切换跟随车标视角或自由沙盘">视角: 自由</button>
+        </div>
+
+        <div class="profile-canvas-wrap">
+          <canvas id="elev-profile-canvas"></canvas>
+        </div>
+
+        <div class="drive-readout">
+          <strong id="readout-km">0.0 / 685.0 km</strong>
+          <span id="readout-elev">海拔 1980 m · ① 范卫平(11.17-19)</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 全画幅零剪裁开篇序幕：从全图推进至细节 + 女声原文解说 -->
+    <div id="intro-modal" class="intro-modal">
+      <div class="intro-topbar">
+        <div class="intro-header-left">
+          <span class="intro-badge">开篇序幕 · 烽火史诗</span>
+          <h2>滇缅公路：用血肉筑就的抗战生命线</h2>
+        </div>
+        <div class="intro-top-actions">
+          <button type="button" id="btn-intro-clarity" class="icon-btn" style="border-color:rgba(245,158,11,0.55);color:#fde68a;">✨ 老地图清晰重制: 开</button>
+          <button type="button" id="btn-intro-fullview" class="icon-btn">查看完整全图</button>
+          <button type="button" id="btn-intro-fulltext" class="icon-btn">本幕全文</button>
+          <button type="button" id="btn-skip-intro" class="icon-btn">跳过序幕 · 进入3D沙盘 ✕</button>
+        </div>
+      </div>
+
+      <div class="prologue-viewport" id="prologue-viewport">
+        <div class="prologue-frame" id="prologue-frame">
+          <img id="intro-media-img" class="prologue-photo" src="./img01_hd.png" alt="滇缅公路开篇原图" />
+          <div id="intro-lens-tag" class="prologue-lens-tag">
+            <span id="intro-lens-text">图一 · 全图概览</span>
+            <span id="intro-zoom-pill" class="prologue-zoom-pill">1.00x 全图无剪裁</span>
+          </div>
+        </div>
+
+        <div id="prologue-fulltext-drawer" class="prologue-fulltext-drawer hidden"></div>
+
+        <!-- 首次进入启幕遮罩，确保点击后女声TTS不被浏览器静音拦截 -->
+        <div id="prologue-start-gate" class="prologue-start-gate">
+          <div class="prologue-gate-card">
+            <h3>开篇影像导读 · 抗战生命线</h3>
+            <p>
+              本序幕将依次以<strong>图一（1938滇缅公路路线全图）</strong>、<strong>图二（二十万老幼妇孺筑路影像）</strong>、<strong>图三（南侨机工运输车队影像）</strong>原图开篇，镜头由<strong>全图完整无剪裁缓缓推进至历史细节</strong>，并由女声逐句朗读全文。
+            </p>
+            <noscript>
+              <div class="ios-noscript-alert">
+                <strong>⚠️ 当前处于 iPhone 文件快速预览模式（系统已禁用交互脚本）</strong><br />
+                苹果 iOS 在「微信文件预览」或系统「文件」App 直接查看本地 HTML 时会屏蔽所有按钮点击与 3D 渲染。<br />
+                <strong>解决方法</strong>：① 点击右上角「…」→「用其他应用打开」→ 选择 <strong>Edge / 夸克 / Alook / Documents / HTML Viewer</strong> 打开；或 ② 通过网页链接在微信或 Safari 中直接打开。
+              </div>
+            </noscript>
+            <div class="prologue-gate-btns">
+              <button type="button" id="btn-gate-start" class="intro-btn primary">▶ 点击开启女声解说序幕</button>
+              <button type="button" id="btn-gate-skip" class="intro-btn">直接进入 3D 沙盘路书</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="prologue-bottom">
+        <div class="prologue-subtitle-box">
+          <div id="intro-chapter-title" class="prologue-act-title">第一幕 · 图一：抗战危局与千公里血肉通道</div>
+          <div id="intro-subtitle-line" class="prologue-subtitle-line">请点击上方按钮开启全画幅女声导读序幕</div>
+        </div>
+
+        <div class="intro-footer">
+          <div class="intro-voice-status">
+            <div id="voice-wave" class="voice-wave">
+              <span></span><span></span><span></span><span></span>
+            </div>
+            <span id="voice-status-text">等待启幕（点击开启后自动连播三幕）</span>
+          </div>
+
+          <div class="intro-dots" id="intro-dots">
+            <button type="button" class="intro-dot active" data-step="0">图一 · 路线全图</button>
+            <button type="button" class="intro-dot" data-step="1">图二 · 血肉筑路</button>
+            <button type="button" class="intro-dot" data-step="2">图三 · 南侨机工</button>
+          </div>
+
+          <div class="intro-actions">
+            <button type="button" id="btn-intro-prev" class="intro-btn">← 上一幕</button>
+            <button type="button" id="btn-toggle-voice" class="intro-btn">暂停解说</button>
+            <button type="button" id="btn-intro-next" class="intro-btn primary">下一幕 →</button>
+            <button type="button" id="btn-intro-enter" class="intro-btn primary" style="display:none;">开启 3D 行路书探索 ➔</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 原文高清图片灯箱 Dialog -->
+    <dialog id="lightbox-dialog" class="app-dialog">
+      <div class="dialog-head">
+        <h2 id="lightbox-title">图片预览</h2>
+        <button type="button" id="btn-close-lightbox" class="icon-btn">关闭</button>
+      </div>
+      <div class="dialog-body">
+        <img id="lightbox-img" class="lightbox-img" src="" alt="" />
+        <div class="lightbox-foot">
+          <span id="lightbox-caption"></span>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button type="button" id="btn-lb-prev" class="icon-btn">上一张</button>
+            <button type="button" id="btn-lb-next" class="icon-btn">下一张</button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- 宏观历史背景与五大贴士 Dialog -->
+    <dialog id="macro-dialog" class="app-dialog">
+      <div class="dialog-head">
+        <h2>抗战生命线总览 & 自驾五大贴士</h2>
+        <button type="button" id="btn-close-macro" class="icon-btn">关闭</button>
+      </div>
+      <div class="dialog-body" id="macro-dialog-body"></div>
+    </dialog>
+
+    <!-- 轻量通知 -->
+    <div id="toast" class="toast"></div>
+
+    <!-- 本地数据、DEM 与零外网依赖 WebGL 引擎（经典脚本挂载全局对象，完全脱机可用） -->
+    <script src="./three-local.js"></script>
+    <script src="./terrain-dem.js"></script>
+    <script src="./roadbook-data.js"></script>
+
+    <!-- 全画幅序幕控制器（独立于 WebGL 初始化，确保任何环境点击按钮 100% 即刻响应） -->
+    <script>
+      (function () {
+        'use strict';
+
+        let clarityEnabled = true;
+
+        function resolveImageSrc(imgId) {
+          if (imgId === 'img01') {
+            if (clarityEnabled) {
+              return (window.EMBEDDED_IMAGES && window.EMBEDDED_IMAGES.img01) || './img01_hd.png';
+            }
+            return (window.EMBEDDED_IMAGES && window.EMBEDDED_IMAGES.img01_raw) || './img01_orig.jpg';
+          }
+          if (window.EMBEDDED_IMAGES && window.EMBEDDED_IMAGES[imgId]) {
+            return window.EMBEDDED_IMAGES[imgId];
+          }
+          return `./images/${imgId}.webp`;
+        }
+        window.resolveRoadbookImageSrc = resolveImageSrc;
+
+        const introModal = document.getElementById('intro-modal');
+        const prologueViewport = document.getElementById('prologue-viewport');
+        const prologueFrame = document.getElementById('prologue-frame');
+        const introImg = document.getElementById('intro-media-img');
+        const introLensText = document.getElementById('intro-lens-text');
+        const introZoomPill = document.getElementById('intro-zoom-pill');
+        const introTitle = document.getElementById('intro-chapter-title');
+        const introSubtitle = document.getElementById('intro-subtitle-line');
+        const fulltextDrawer = document.getElementById('prologue-fulltext-drawer');
+        const startGate = document.getElementById('prologue-start-gate');
+        const voiceWave = document.getElementById('voice-wave');
+        const voiceStatusText = document.getElementById('voice-status-text');
+        const btnToggleVoice = document.getElementById('btn-toggle-voice');
+        const btnIntroClarity = document.getElementById('btn-intro-clarity');
+        const btnIntroFullView = document.getElementById('btn-intro-fullview');
+        const btnIntroFullText = document.getElementById('btn-intro-fulltext');
+        const btnIntroPrev = document.getElementById('btn-intro-prev');
+        const btnIntroNext = document.getElementById('btn-intro-next');
+        const btnIntroEnter = document.getElementById('btn-intro-enter');
+        const introDots = document.querySelectorAll('.intro-dot');
+
+        const PROLOGUE_CHAPTERS = [
+          {
+            step: 0,
+            imgId: 'img01',
+            natW: 2048,
+            natH: 1010,
+            title: '第一幕 · 图一：抗战危局与滇缅公路路线全图（1938）',
+            shots: [
+              {
+                label: '图一 · 全图无剪裁概览（滇缅公路全线：昆明 → 腊戍）',
+                scaleFrom: 1.0, fxFrom: 0.50, fyFrom: 0.50,
+                scaleTo: 1.0, fxTo: 0.50, fyTo: 0.50,
+                text: '1937年“七七事变”后，抗日战争全面爆发。日军迅速封锁中国沿海港口，切断主要铁路交通，妄图将中国困为孤岛。在此危亡之际，开辟新的国际运输通道成为当务之急。',
+                speech: '1937年七七事变后，抗日战争全面爆发。日军迅速封锁中国沿海港口，切断主要铁路交通，妄图将中国困为孤岛。在此危亡之际，开辟新的国际运输通道成为当务之急。'
+              },
+              {
+                label: '推进细节 · 民国二十七年七月《滇缅公路路线图》图题与东段线',
+                scaleFrom: 1.0, fxFrom: 0.50, fyFrom: 0.50,
+                scaleTo: 1.48, fxTo: 0.62, fyTo: 0.66,
+                text: '滇缅公路于1937年底动工，1938年8月通车，全长1146.1公里，中国境内段959.4公里。',
+                speech: '滇缅公路于1937年底动工，1938年8月通车，全长1146.1公里，中国境内段959.4公里。'
+              },
+              {
+                label: '深推西段险道与三段实地考察路线 · 下关 → 保山 → 腾冲 → 畹町',
+                scaleFrom: 1.48, fxFrom: 0.62, fyFrom: 0.66,
+                scaleTo: 2.02, fxTo: 0.34, fyTo: 0.34,
+                text: '其中下关至畹町西段长达547.8公里，需跨越漾濞江、澜沧江、怒江，翻越云岭、高黎贡山，工程极为艰险。',
+                speech: '其中下关至畹町西段长达547.8公里，需跨越漾濞江、澜沧江、怒江，翻越云岭、高黎贡山，工程极为艰险。'
+              },
+              {
+                label: '推进细节 · 畹町出境至腊戍段及手写筑路工段图例',
+                scaleFrom: 2.02, fxFrom: 0.34, fyFrom: 0.34,
+                scaleTo: 1.88, fxTo: 0.25, fyTo: 0.72,
+                text: '在几乎没有大型机械的情况下，多民族筑路大军全靠锄头、十字镐和双手。施工高峰期，每天有20万民工奋战一线，其中多为老人、妇女和儿童，最小的仅6岁。他们自带干粮工具，风餐露宿，以血肉之躯开山辟路。',
+                speech: '在几乎没有大型机械的情况下，多民族筑路大军全靠锄头、十字镐和双手。施工高峰期，每天有20万民工奋战一线，其中多为老人、妇女和儿童，最小的仅6岁。他们自带干粮工具，风餐露宿，以血肉之躯开山辟路。'
+              }
+            ]
+          },
+          {
+            step: 1,
+            imgId: 'img02',
+            natW: 618,
+            natH: 334,
+            title: '第二幕 · 图二：二十万多民族老幼妇孺以血肉开山辟路',
+            shots: [
+              {
+                label: '图二 · 全图无剪裁驻留（碎石坡上的老妇、少女与两名幼童）',
+                scaleFrom: 1.0, fxFrom: 0.50, fyFrom: 0.50,
+                scaleTo: 1.0, fxTo: 0.50, fyTo: 0.50,
+                text: '由于工程险峻、条件恶劣，加之沿线瘴气肆虐，民工伤亡惨重。据档案记载，殉难者约3000人，平均每公里3人，伤者无数。有县长悲叹：“不是公路，是血路。”',
+                speech: '由于工程险峻、条件恶劣，加之沿线瘴气肆虐，民工伤亡惨重。据档案记载，殉难者约3000人，平均每公里3人，伤者无数。有县长悲叹：不是公路，是血路。'
+              },
+              {
+                label: '推进细节 · 肩挑箢箩的白发老妇与手握铁钎的少女',
+                scaleFrom: 1.0, fxFrom: 0.50, fyFrom: 0.50,
+                scaleTo: 1.85, fxTo: 0.29, fyTo: 0.40,
+                text: '经过九个月日夜赶工，滇缅公路全线通车，震惊世界。美国驻华大使感叹，这条纯靠人力开辟的公路，“为全世界任何民族所不及”。',
+                speech: '经过九个月日夜赶工，滇缅公路全线通车，震惊世界。美国驻华大使感叹，这条纯靠人力开辟的公路，为全世界任何民族所不及。'
+              },
+              {
+                label: '横移推进细节 · 赤足踩在乱石上的衣衫褴褛筑路幼童',
+                scaleFrom: 1.85, fxFrom: 0.29, fyFrom: 0.40,
+                scaleTo: 1.95, fxTo: 0.70, fyTo: 0.56,
+                text: '在缅甸沦陷、惠通桥炸毁前的三年多时间里，滇缅公路共运送物资50万吨，占当时国际援华物资的90%。其间日军不停轰炸，国人不懈保卫、抢修。',
+                speech: '在缅甸沦陷、惠通桥炸毁前的三年多时间里，滇缅公路共运送物资50万吨，占当时国际援华物资的90%。其间日军不停轰炸，国人不懈保卫、抢修。'
+              },
+              {
+                label: '缓步回拉全貌 · 献身滇西群山的民工与南侨机工群像',
+                scaleFrom: 1.95, fxFrom: 0.70, fyFrom: 0.56,
+                scaleTo: 1.18, fxTo: 0.50, fyTo: 0.50,
+                text: '公路通车后，3200余名南洋华侨机工回国投身抗战运输。他们日夜穿行在险峻的滇西群山中，以生命保障着这条生命线的畅通。在永平县铁丝窝路段，因日军间谍引爆车辆，导致数十名机工壮烈牺牲，他们长眠于此，后人称为“机工坟”。',
+                speech: '公路通车后，3200余名南洋华侨机工回国投身抗战运输。他们日夜穿行在险峻的滇西群山中，以生命保障着这条生命线的畅通。在永平县铁丝窝路段，因日军间谍引爆车辆，导致数十名机工壮烈牺牲，他们长眠于此，后人称为机工坟。'
+              }
+            ]
+          },
+          {
+            step: 2,
+            imgId: 'img03',
+            natW: 1080,
+            natH: 678,
+            title: '第三幕 · 图三：守护抗战生命线！致敬南侨机工永不褪色的青春',
+            shots: [
+              {
+                label: '图三 · 全图无剪裁驻留（R6152 号运输军卡与南侨机工）',
+                scaleFrom: 1.0, fxFrom: 0.50, fyFrom: 0.50,
+                scaleTo: 1.0, fxTo: 0.50, fyTo: 0.50,
+                text: '守护抗战生命线！致敬南侨机工永不褪色的青春。',
+                speech: '守护抗战生命线！致敬南侨机工永不褪色的青春。'
+              },
+              {
+                label: '推进细节 · 头戴风镜帽、手扶驾驶室车门的青年机工身影',
+                scaleFrom: 1.0, fxFrom: 0.50, fyFrom: 0.50,
+                scaleTo: 2.05, fxTo: 0.39, fyTo: 0.53,
+                text: '日军深知滇缅公路是中国最后的生命线，为彻底切断这条通道，采取了空袭与细菌战并用的残暴手段。1942年5月4日，日军对保山城发动“五四”大轰炸，正值赶集日，27架日机投下大量炸弹及燃烧弹，直接炸死8800余人，占城区人口三分之一，全城七成房屋被毁。更为残忍的是，日军在轰炸中投下携带鼠疫、霍乱病菌的细菌弹，导致瘟疫在滇西蔓延，后续死亡人数高达6万余人。日军在保山实施的轰炸与细菌战，是人类战争史上罕见的无差别屠杀。如今当地耄耋之年的长者中还有亲历者。',
+                speech: '日军深知滇缅公路是中国最后的生命线，为彻底切断这条通道，采取了空袭与细菌战并用的残暴手段。1942年5月4日，日军对保山城发动五四大轰炸，正值赶集日，27架日机投下大量炸弹及燃烧弹，直接炸死8800余人，占城区人口三分之一，全城七成房屋被毁。更为残忍的是，日军在轰炸中投下携带鼠疫、霍乱病菌的细菌弹，导致瘟疫在滇西蔓延，后续死亡人数高达6万余人。日军在保山实施的轰炸与细菌战，是人类战争史上罕见的无差别屠杀。如今当地耄耋之年的长者中还有亲历者。'
+              },
+              {
+                label: '横移推进细节 · 重型运输卡车车头与“R6152”编号车牌',
+                scaleFrom: 2.05, fxFrom: 0.39, fyFrom: 0.53,
+                scaleTo: 1.82, fxTo: 0.66, fyTo: 0.58,
+                text: '大理作为滇缅公路核心枢纽，同样承受了巨大牺牲。功果桥被炸16次，军民日夜抢修，被誉为“炸不断的桥”；云南驿机场被炸6次，三千余民工牺牲。飞虎队从云南驿起飞，在怒江上空阻击日军，将其阻挡在怒江西岸。日军败退后，公路重建，为反攻提供了重要通道。',
+                speech: '大理作为滇缅公路核心枢纽，同样承受了巨大牺牲。功果桥被炸16次，军民日夜抢修，被誉为炸不断的桥；云南驿机场被炸6次，三千余民工牺牲。飞虎队从云南驿起飞，在怒江上空阻击日军，将其阻挡在怒江西岸。日军败退后，公路重建，为反攻提供了重要通道。'
+              },
+              {
+                label: '回落全图定格 · 滇缅公路是不屈民族精神的见证',
+                scaleFrom: 1.82, fxFrom: 0.66, fyFrom: 0.58,
+                scaleTo: 1.0, fxTo: 0.50, fyTo: 0.50,
+                text: '滇缅公路，是抗战的输血管，也是中华民族不屈精神的见证。滇缅公路是一条什么路？',
+                speech: '滇缅公路，是抗战的输血管，也是中华民族不屈精神的见证。滇缅公路是一条什么路？'
+              }
+            ]
+          }
+        ];
+
+        let introCurrentStep = 0;
+        let introCurrentShot = 0;
+        let isPrologueStarted = false;
+        let isSpeechPaused = false;
+        let forceFullView = false;
+        let femaleVoice = null;
+        let frameW = 800;
+        let frameH = 450;
+        let shotPlaybackToken = 0;
+        let fallbackTimer = null;
+        let startCheckTimer = null;
+        let watchdogTimer = null;
+
+        const lensState = {
+          curScale: 1.0, curFx: 0.5, curFy: 0.5,
+          fromScale: 1.0, fromFx: 0.5, fromFy: 0.5,
+          toScale: 1.0, toFx: 0.5, toFy: 0.5,
+          startTime: 0, durationMs: 4000
+        };
+
+        function layoutPrologueFrame() {
+          const chap = PROLOGUE_CHAPTERS[introCurrentStep];
+          if (!chap || !prologueViewport) return;
+          const padW = 40;
+          const padH = 28;
+          const availW = Math.max(240, prologueViewport.clientWidth - padW);
+          const availH = Math.max(180, prologueViewport.clientHeight - padH);
+          const ratio = chap.natW / chap.natH;
+          let w = availW;
+          let h = w / ratio;
+          if (h > availH) {
+            h = availH;
+            w = h * ratio;
+          }
+          frameW = Math.round(w);
+          frameH = Math.round(h);
+          prologueFrame.style.width = `${frameW}px`;
+          prologueFrame.style.height = `${frameH}px`;
+          applyLensTransform();
+        }
+        window.layoutPrologueFrameExternal = layoutPrologueFrame;
+
+        function computeClampedTransform(s, fx, fy, w, h) {
+          const minTx = w * (1 - s);
+          const minTy = h * (1 - s);
+          const rawTx = (0.5 - fx * s) * w;
+          const rawTy = (0.5 - fy * s) * h;
+          const tx = Math.max(minTx, Math.min(0, rawTx));
+          const ty = Math.max(minTy, Math.min(0, rawTy));
+          return { tx, ty, s };
+        }
+
+        function applyLensTransform() {
+          const s = forceFullView ? 1.0 : lensState.curScale;
+          const fx = forceFullView ? 0.5 : lensState.curFx;
+          const fy = forceFullView ? 0.5 : lensState.curFy;
+          const { tx, ty } = computeClampedTransform(s, fx, fy, frameW, frameH);
+          introImg.style.transform = `translate3d(${tx.toFixed(2)}px, ${ty.toFixed(2)}px, 0) scale(${s.toFixed(4)})`;
+          introZoomPill.textContent = s <= 1.02 ? '1.00x 全图无剪裁' : `${s.toFixed(2)}x 细节推进`;
+        }
+
+        function tickPrologueLens(now) {
+          requestAnimationFrame(tickPrologueLens);
+          if (introModal.classList.contains('hidden')) return;
+          const elapsed = Math.max(0, now - lensState.startTime);
+          const t = Math.min(1, elapsed / Math.max(1, lensState.durationMs));
+          const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+          lensState.curScale = lensState.fromScale + (lensState.toScale - lensState.fromScale) * ease;
+          lensState.curFx = lensState.fromFx + (lensState.toFx - lensState.fromFx) * ease;
+          lensState.curFy = lensState.fromFy + (lensState.toFy - lensState.fromFy) * ease;
+          applyLensTransform();
+        }
+        requestAnimationFrame(tickPrologueLens);
+
+        introImg.addEventListener('load', () => {
+          if (introImg.naturalWidth && introImg.naturalHeight) {
+            const chap = PROLOGUE_CHAPTERS[introCurrentStep];
+            if (chap) {
+              chap.natW = introImg.naturalWidth;
+              chap.natH = introImg.naturalHeight;
+            }
+            layoutPrologueFrame();
+          }
+        });
+
+        function detectChineseFemaleVoice() {
+          if (!('speechSynthesis' in window)) return null;
+          const voices = window.speechSynthesis.getVoices();
+          const femaleKeywords = ['Xiaoxiao', 'Xiaoyi', 'Tingting', 'Ting-Ting', 'Meijia', 'Mei-Jia', 'Sinji', 'Sin-Ji', 'Yaoyao', 'Huihui', 'Lili', 'Yu-shu'];
+          const maleBlacklist = ['Kangkang', 'Yunxi', 'Yunjian', 'Yunyang', 'Danny', 'Zhiwei'];
+          for (const kw of femaleKeywords) {
+            const hit = voices.find((v) => v.name.includes(kw));
+            if (hit) return hit;
+          }
+          return (
+            voices.find(
+              (v) =>
+                v.lang &&
+                v.lang.toLowerCase().startsWith('zh') &&
+                !maleBlacklist.some((m) => v.name.includes(m))
+            ) || null
+          );
+        }
+
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.onvoiceschanged = () => {
+            femaleVoice = detectChineseFemaleVoice();
+          };
+          femaleVoice = detectChineseFemaleVoice();
+        }
+
+        function clearTimers() {
+          if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+          if (startCheckTimer) { clearTimeout(startCheckTimer); startCheckTimer = null; }
+          if (watchdogTimer) { clearTimeout(watchdogTimer); watchdogTimer = null; }
+        }
+
+        function stopAllNarration() {
+          shotPlaybackToken++;
+          clearTimers();
+          if ('speechSynthesis' in window) {
+            try {
+              if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+                window.speechSynthesis.cancel();
+              }
+            } catch (e) {}
+          }
+          voiceWave.classList.remove('active');
+        }
+
+        function renderFulltextDrawer(chap) {
+          fulltextDrawer.innerHTML = `
+            <div style="font-weight:700;color:var(--gold);margin-bottom:8px;">${chap.title}</div>
+            ${chap.shots
+              .map(
+                (s, i) => `
+              <p style="margin:0 0 8px;${i === introCurrentShot ? 'color:#fde68a;font-weight:600;' : 'color:#cbd5d0;'}">
+                ${s.text}
+              </p>`
+              )
+              .join('')}
+          `;
+        }
+
+        function playShot(step, shotIdx) {
+          const chap = PROLOGUE_CHAPTERS[step];
+          if (!chap) return;
+          const shot = chap.shots[shotIdx];
+          if (!shot) return;
+
+          introCurrentShot = shotIdx;
+          const myToken = ++shotPlaybackToken;
+          clearTimers();
+
+          introLensText.textContent = shot.label;
+          introSubtitle.textContent = shot.text;
+          renderFulltextDrawer(chap);
+
+          const estMs = Math.max(4200, shot.speech.length * 225);
+          lensState.fromScale = shot.scaleFrom;
+          lensState.fromFx = shot.fxFrom;
+          lensState.fromFy = shot.fyFrom;
+          lensState.toScale = shot.scaleTo;
+          lensState.toFx = shot.fxTo;
+          lensState.toFy = shot.fyTo;
+          lensState.curScale = shot.scaleFrom;
+          lensState.curFx = shot.fxFrom;
+          lensState.curFy = shot.fyFrom;
+          lensState.startTime = performance.now();
+          lensState.durationMs = estMs;
+          applyLensTransform();
+
+          if (!isPrologueStarted || isSpeechPaused) {
+            voiceWave.classList.remove('active');
+            return;
+          }
+
+          let advanced = false;
+          const advanceNext = () => {
+            if (advanced || myToken !== shotPlaybackToken || isSpeechPaused || !isPrologueStarted) return;
+            advanced = true;
+            clearTimers();
+            voiceWave.classList.remove('active');
+            fallbackTimer = setTimeout(() => {
+              if (myToken !== shotPlaybackToken || isSpeechPaused) return;
+              if (shotIdx + 1 < chap.shots.length) {
+                playShot(step, shotIdx + 1);
+              } else if (step + 1 < PROLOGUE_CHAPTERS.length) {
+                loadPrologueChapter(step + 1);
+              } else {
+                voiceStatusText.textContent = '三幕序言解说完毕 · 点击「开启 3D 行路书探索」进入沙盘';
+              }
+            }, 480);
+          };
+
+          let ttsStarted = false;
+          if ('speechSynthesis' in window) {
+            try {
+              if (window.speechSynthesis.speaking || window.speechSynthesis.pending) {
+                window.speechSynthesis.cancel();
+              }
+              const utt = new SpeechSynthesisUtterance(shot.speech);
+              utt.lang = 'zh-CN';
+              utt.rate = 0.94;
+              utt.pitch = 1.06;
+              if (!femaleVoice) femaleVoice = detectChineseFemaleVoice();
+              if (femaleVoice) utt.voice = femaleVoice;
+
+              utt.onstart = () => {
+                if (myToken !== shotPlaybackToken) return;
+                ttsStarted = true;
+                voiceWave.classList.add('active');
+                const vName = femaleVoice ? femaleVoice.name : '中文女声';
+                voiceStatusText.textContent = `女声解说中 (${vName}) · 第${step + 1}/3幕 · 镜${shotIdx + 1}/${chap.shots.length}`;
+              };
+              utt.onend = advanceNext;
+              utt.onerror = () => {
+                if (myToken !== shotPlaybackToken) return;
+                voiceStatusText.textContent = `字幕推镜播放中 · 第${step + 1}/3幕 · 镜${shotIdx + 1}/${chap.shots.length}`;
+              };
+
+              window.speechSynthesis.speak(utt);
+
+              // 若部分内嵌浏览器不支持 TTS 且既不触发 onstart 也不触发 onerror，1.2秒后自动提示并继续定时推镜
+              startCheckTimer = setTimeout(() => {
+                if (myToken !== shotPlaybackToken || ttsStarted) return;
+                voiceStatusText.textContent = `字幕推进中（系统未激活语音引擎） · 第${step + 1}/3幕 · 镜${shotIdx + 1}/${chap.shots.length}`;
+              }, 1200);
+
+              // 看门狗定时保障：无论 onend 是否触发，保证不会卡死在当前镜
+              watchdogTimer = setTimeout(advanceNext, estMs + 1400);
+            } catch (e) {
+              voiceStatusText.textContent = `字幕推进中 · 第${step + 1}/3幕 · 镜${shotIdx + 1}/${chap.shots.length}`;
+              watchdogTimer = setTimeout(advanceNext, estMs);
+            }
+          } else {
+            voiceStatusText.textContent = `字幕推进中 · 第${step + 1}/3幕 · 镜${shotIdx + 1}/${chap.shots.length}`;
+            watchdogTimer = setTimeout(advanceNext, estMs);
+          }
+        }
+
+        function loadPrologueChapter(step) {
+          stopAllNarration();
+          introCurrentStep = Math.max(0, Math.min(PROLOGUE_CHAPTERS.length - 1, step));
+          introCurrentShot = 0;
+          const chap = PROLOGUE_CHAPTERS[introCurrentStep];
+
+          introImg.src = resolveImageSrc(chap.imgId);
+          introTitle.textContent = chap.title;
+          btnIntroClarity.style.display = introCurrentStep === 0 ? 'inline-flex' : 'none';
+          layoutPrologueFrame();
+
+          introDots.forEach((d, idx) => d.classList.toggle('active', idx === introCurrentStep));
+          btnIntroPrev.disabled = introCurrentStep === 0;
+          if (introCurrentStep === PROLOGUE_CHAPTERS.length - 1) {
+            btnIntroNext.style.display = 'none';
+            btnIntroEnter.style.display = 'inline-flex';
+          } else {
+            btnIntroNext.style.display = 'inline-flex';
+            btnIntroEnter.style.display = 'none';
+          }
+
+          playShot(introCurrentStep, 0);
+        }
+
+        function startProloguePlayback() {
+          isPrologueStarted = true;
+          isSpeechPaused = false;
+          btnToggleVoice.textContent = '暂停解说';
+          startGate.classList.add('hidden');
+          loadPrologueChapter(introCurrentStep);
+        }
+
+        function showPrologueToast(msg) {
+          const el = document.getElementById('toast');
+          if (!el) return;
+          el.textContent = msg;
+          el.classList.add('show');
+          clearTimeout(el._t);
+          el._t = setTimeout(() => el.classList.remove('show'), 2200);
+        }
+
+        function closePrologueModal() {
+          stopAllNarration();
+          introModal.classList.add('hidden');
+          showPrologueToast('已进入 3D 地形沙盘！可随时点击顶部「播放开篇解说」重新观看。');
+        }
+
+        function bindTap(el, handler) {
+          if (!el) return;
+          let startX = 0;
+          let startY = 0;
+          let lastTouchTapMs = -1000;
+          el.addEventListener('touchstart', (e) => {
+            if (e.touches && e.touches.length === 1) {
+              startX = e.touches[0].clientX;
+              startY = e.touches[0].clientY;
+            }
+          }, { passive: true });
+          el.addEventListener('touchend', (e) => {
+            if (!e.changedTouches || !e.changedTouches.length) return;
+            const dx = Math.abs(e.changedTouches[0].clientX - startX);
+            const dy = Math.abs(e.changedTouches[0].clientY - startY);
+            if (dx < 14 && dy < 14) {
+              e.preventDefault();
+              lastTouchTapMs = performance.now();
+              handler(e);
+            }
+          });
+          el.addEventListener('click', (e) => {
+            if (performance.now() - lastTouchTapMs < 400) return;
+            handler(e);
+          });
+        }
+
+        bindTap(document.getElementById('btn-gate-start'), startProloguePlayback);
+        bindTap(document.getElementById('btn-gate-skip'), closePrologueModal);
+        bindTap(document.getElementById('btn-skip-intro'), closePrologueModal);
+        bindTap(btnIntroEnter, closePrologueModal);
+
+        bindTap(btnIntroPrev, () => {
+          isPrologueStarted = true;
+          isSpeechPaused = false;
+          btnToggleVoice.textContent = '暂停解说';
+          startGate.classList.add('hidden');
+          loadPrologueChapter(introCurrentStep - 1);
+        });
+        bindTap(btnIntroNext, () => {
+          isPrologueStarted = true;
+          isSpeechPaused = false;
+          btnToggleVoice.textContent = '暂停解说';
+          startGate.classList.add('hidden');
+          loadPrologueChapter(introCurrentStep + 1);
+        });
+        introDots.forEach((dot) => {
+          bindTap(dot, () => {
+            isPrologueStarted = true;
+            isSpeechPaused = false;
+            btnToggleVoice.textContent = '暂停解说';
+            startGate.classList.add('hidden');
+            loadPrologueChapter(Number(dot.dataset.step));
+          });
+        });
+
+        bindTap(btnToggleVoice, () => {
+          if (!isPrologueStarted) {
+            startProloguePlayback();
+            return;
+          }
+          isSpeechPaused = !isSpeechPaused;
+          if (isSpeechPaused) {
+            stopAllNarration();
+            btnToggleVoice.textContent = '继续解说';
+            voiceStatusText.textContent = '旁白解说已暂停';
+          } else {
+            btnToggleVoice.textContent = '暂停解说';
+            playShot(introCurrentStep, introCurrentShot);
+          }
+        });
+
+        bindTap(btnIntroFullView, () => {
+          forceFullView = !forceFullView;
+          btnIntroFullView.textContent = forceFullView ? '恢复推进运镜' : '查看完整全图';
+          applyLensTransform();
+        });
+
+        bindTap(btnIntroClarity, () => {
+          clarityEnabled = !clarityEnabled;
+          btnIntroClarity.textContent = clarityEnabled ? '✨ 老地图清晰重制: 开' : '✨ 老地图清晰重制: 关(原扫描件)';
+          if (introCurrentStep === 0) {
+            introImg.src = resolveImageSrc('img01');
+          }
+          applyLensTransform();
+        });
+
+        bindTap(btnIntroFullText, () => {
+          fulltextDrawer.classList.toggle('hidden');
+        });
+
+        bindTap(document.getElementById('btn-open-intro'), () => {
+          introModal.classList.remove('hidden');
+          startGate.classList.add('hidden');
+          isPrologueStarted = true;
+          isSpeechPaused = false;
+          btnToggleVoice.textContent = '暂停解说';
+          loadPrologueChapter(0);
+        });
+
+        window.addEventListener('resize', layoutPrologueFrame);
+        // 立刻同步加载超清重制图一与完整未剪裁画幅
+        loadPrologueChapter(0);
+      })();
+    </script>
+
+    <!-- 3D 地形沙盘核心逻辑（使用本地 three-local.js，零外网阻塞） -->
+    <script>
+      (function () {
+        'use strict';
+        const THREE = window.THREE;
+        const OrbitControls = window.OrbitControls;
+        const CSS2DRenderer = window.CSS2DRenderer;
+        const CSS2DObject = window.CSS2DObject;
+        const DEM = window.BURMA_DEM;
+        const DATA = window.BURMA_ROADBOOK;
+        const resolveImageSrc = window.resolveRoadbookImageSrc || ((id) => `./images/${id}.webp`);
+
+      // ========== 1. 初始化场景、相机、渲染器 ==========
+      const webglHost = document.getElementById('webgl-container');
+      const labelHost = document.getElementById('label-layer');
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x080d0b);
+      scene.fog = new THREE.FogExp2(0x09100d, 0.0011);
+
+      const CAM_OVERVIEW = {
+        pos: new THREE.Vector3(28, 128, 152),
+        target: new THREE.Vector3(-8, 3.0, 6)
+      };
+      const CAM_DALI = {
+        pos: new THREE.Vector3(92, 52, -16),
+        target: new THREE.Vector3(62, 3.0, -68)
+      };
+
+      const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.3, 1200);
+      camera.position.copy(CAM_OVERVIEW.pos);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.08;
+      webglHost.appendChild(renderer.domElement);
+
+      const labelRenderer = new CSS2DRenderer();
+      labelRenderer.setSize(window.innerWidth, window.innerHeight);
+      labelHost.appendChild(labelRenderer.domElement);
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.07;
+      controls.maxPolarAngle = Math.PI * 0.47;
+      controls.minDistance = 5;
+      controls.maxDistance = 360;
+      controls.target.copy(CAM_OVERVIEW.target);
+
+      // 灯光系统（西北斜阳主光 + 山谷环境补光）
+      const hemiLight = new THREE.HemisphereLight(0xdbeafe, 0x1a2e22, 0.85);
+      scene.add(hemiLight);
+
+      const sunLight = new THREE.DirectionalLight(0xfff5e4, 1.45);
+      sunLight.position.set(-70, 120, -60);
+      scene.add(sunLight);
+
+      const rimLight = new THREE.DirectionalLight(0x60a5fa, 0.42);
+      rimLight.position.set(80, 42, 76);
+      scene.add(rimLight);
+
+      // ========== 2. 三维地形底座与 Google Maps 贴图引擎 ==========
+      let verticalScale = 2.6;
+      const terrainGeo = new THREE.PlaneGeometry(
+        DEM.WORLD_WIDTH,
+        DEM.WORLD_DEPTH,
+        DEM.GRID_COLS - 1,
+        DEM.GRID_ROWS - 1
+      );
+      terrainGeo.rotateX(-Math.PI / 2);
+
+      const posAttr = terrainGeo.attributes.position;
+      function updateTerrainVertices() {
+        for (let i = 0; i < posAttr.count; i++) {
+          const elev = DEM.demGrid[i];
+          posAttr.setY(i, DEM.elevationToWorldY(elev, verticalScale));
+        }
+        posAttr.needsUpdate = true;
+        terrainGeo.computeVertexNormals();
+      }
+      updateTerrainVertices();
+
+      // 初始同步生成高精等高线沙盘纹理（保证0毫秒立即可见）
+      const proceduralCanvas = DEM.generateProceduralTopoCanvas(1600, 1420);
+      const proceduralTex = new THREE.CanvasTexture(proceduralCanvas);
+      proceduralTex.colorSpace = THREE.SRGBColorSpace;
+      proceduralTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+      const terrainMat = new THREE.MeshStandardMaterial({
+        map: proceduralTex,
+        roughness: 0.88,
+        metalness: 0.04
+      });
+
+      const terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
+      scene.add(terrainMesh);
+
+      // 沙盘底座侧裙（切面厚度视觉）
+      const plinthGeo = new THREE.BoxGeometry(DEM.WORLD_WIDTH, 2.4, DEM.WORLD_DEPTH);
+      const plinthMat = new THREE.MeshStandardMaterial({
+        color: 0x0f1a15,
+        roughness: 0.9,
+        metalness: 0.1
+      });
+      const plinthMesh = new THREE.Mesh(plinthGeo, plinthMat);
+      plinthMesh.position.y = -1.25;
+      scene.add(plinthMesh);
+
+      // 洱海与功果桥水库高光水面提示层
+      const waterGroup = new THREE.Group();
+      scene.add(waterGroup);
+
+      function buildReservoirWater() {
+        while (waterGroup.children.length) waterGroup.remove(waterGroup.children[0]);
+        // 功果桥电站水库蓄水区示意水面 (1285m 蓄水线)
+        const rCenter = DEM.latLngToWorldXZ(25.595, 99.318);
+        const resGeo = new THREE.PlaneGeometry(5.5, 9.5);
+        resGeo.rotateX(-Math.PI / 2);
+        const resMat = new THREE.MeshStandardMaterial({
+          color: 0x0284c7,
+          transparent: true,
+          opacity: 0.32,
+          roughness: 0.15,
+          metalness: 0.55
+        });
+        const resMesh = new THREE.Mesh(resGeo, resMat);
+        resMesh.position.set(rCenter.x, DEM.elevationToWorldY(1288, verticalScale), rCenter.z);
+        resMesh.rotation.y = 0.35;
+        waterGroup.add(resMesh);
+      }
+      buildReservoirWater();
+
+      // Google Maps 瓦片异步加载 + 缓存切换
+      const cachedTextures = { procedural: proceduralTex };
+      const basemapStatusEl = document.getElementById('basemap-status');
+
+      async function applyBasemap(mode) {
+        if (cachedTextures[mode]) {
+          terrainMat.map = cachedTextures[mode];
+          terrainMat.needsUpdate = true;
+          updateBasemapBadge(mode, cachedTextures[mode].userData?.provider || mode);
+          return;
+        }
+        basemapStatusEl.textContent = '请求 Google 瓦片中…';
+        basemapStatusEl.classList.remove('is-offline');
+
+        const res = await DEM.loadGoogleMapDrapeCanvas(mode, { zoom: 10 });
+        if (res.ok && res.canvas) {
+          const tex = new THREE.CanvasTexture(res.canvas);
+          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+          tex.userData = { provider: res.provider };
+          cachedTextures[mode] = tex;
+          if (document.getElementById('basemap-select').value === mode) {
+            terrainMat.map = tex;
+            terrainMat.needsUpdate = true;
+            updateBasemapBadge(mode, res.provider);
+          }
+        } else {
+          // 离线或被屏蔽时无缝安全维持高清离线等高线地形沙盘
+          terrainMat.map = proceduralTex;
+          terrainMat.needsUpdate = true;
+          basemapStatusEl.textContent = '离线/受限 · 已启用本地高精DEM沙盘';
+          basemapStatusEl.classList.add('is-offline');
+        }
+      }
+
+      function updateBasemapBadge(mode, provider) {
+        if (mode === 'procedural') {
+          basemapStatusEl.textContent = '本地 DEM 等高线地貌';
+          basemapStatusEl.classList.remove('is-offline');
+        } else if (provider.startsWith('google')) {
+          basemapStatusEl.textContent = '已贴合 Google Maps 实景';
+          basemapStatusEl.classList.remove('is-offline');
+        } else if (provider === 'arcgis-sat') {
+          basemapStatusEl.textContent = 'WGS-84 卫星遥感兜底';
+          basemapStatusEl.classList.remove('is-offline');
+        }
+      }
+
+      // 默认尝试加载 Google Maps 卫星图（离线自动回退）
+      applyBasemap('google-sat');
+
+      // ========== 3. 五层三维路线管线（含三段考察路线图）与水面浮光构建 ==========
+      const routeGroups = {
+        expedition: new THREE.Group(),
+        modern: new THREE.Group(),
+        historical: new THREE.Group(),
+        heritage: new THREE.Group(),
+        traps: new THREE.Group()
+      };
+      Object.values(routeGroups).forEach((g) => scene.add(g));
+
+      // 为模拟行车预先采样插值出密集轨迹点（支持 685km 考察全线 & 178km 大理段）
+      let modernDriveSamples = [];
+      let expeditionSamples = [];
+
+      function buildCurveMesh(latLngList, options) {
+        const opts = options || {};
+        const elevOffset = opts.elevOffset ?? 75;
+        const pts = latLngList.map((pt) => {
+          const w = DEM.latLngToWorld(pt[0], pt[1], verticalScale, elevOffset);
+          return new THREE.Vector3(w.x, w.y, w.z);
+        });
+        const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.25);
+        const segCount = Math.max(40, pts.length * 10);
+
+        if (opts.dashed) {
+          const linePts = curve.getPoints(segCount);
+          const geo = new THREE.BufferGeometry().setFromPoints(linePts);
+          const mat = new THREE.LineDashedMaterial({
+            color: opts.color,
+            dashSize: opts.dashSize || 0.7,
+            gapSize: opts.gapSize || 0.45,
+            transparent: true,
+            opacity: opts.opacity ?? 0.92
+          });
+          const line = new THREE.Line(geo, mat);
+          line.computeLineDistances();
+          return { mesh: line, curve };
+        }
+
+        const tubeGeo = new THREE.TubeGeometry(curve, segCount, opts.radius || 0.22, 8, false);
+        const tubeMat = new THREE.MeshStandardMaterial({
+          color: opts.color,
+          emissive: opts.emissive || opts.color,
+          emissiveIntensity: opts.emissiveIntensity ?? 0.35,
+          roughness: 0.4,
+          metalness: 0.15,
+          transparent: opts.opacity !== undefined && opts.opacity < 1,
+          opacity: opts.opacity ?? 1
+        });
+        return { mesh: new THREE.Mesh(tubeGeo, tubeMat), curve };
+      }
+
+      function addDirectionCones(group, curve, color, emissive, tList) {
+        tList.forEach((t) => {
+          const pos = curve.getPoint(t);
+          const tan = curve.getTangent(t);
+          const coneGeo = new THREE.ConeGeometry(0.95, 2.5, 10);
+          // 旋转使圆锥尖端指向 +Z 方向，再用 yaw/pitch 朝向切线
+          coneGeo.rotateX(Math.PI / 2);
+          const coneMat = new THREE.MeshStandardMaterial({
+            color,
+            emissive,
+            emissiveIntensity: 0.75,
+            roughness: 0.25
+          });
+          const cone = new THREE.Mesh(coneGeo, coneMat);
+          cone.position.copy(pos);
+          const horiz = Math.hypot(tan.x, tan.z) || 1e-6;
+          cone.rotation.y = Math.atan2(tan.x, tan.z);
+          cone.rotation.x = -Math.atan2(tan.y, horiz);
+          group.add(cone);
+        });
+      }
+
+      function rebuildAllRoutes() {
+        Object.values(routeGroups).forEach((g) => {
+          while (g.children.length) {
+            const c = g.children[0];
+            c.traverse((child) => {
+              if (child.isCSS2DObject && child.element && child.element.parentNode) {
+                child.element.parentNode.removeChild(child.element);
+              }
+            });
+            g.remove(c);
+            c.geometry?.dispose();
+            c.material?.dispose();
+          }
+        });
+
+        // 0. 滇缅公路实地考察三段路线图（朱砂红下关-保山 · 石青蓝保山-腾冲 · 松石绿腾冲-畹町）
+        const expRawSamples = [];
+        const expStageBounds = [
+          { startKm: 0, targetEndKm: 262.0 },
+          { startKm: 262.0, targetEndKm: 412.0 },
+          { startKm: 412.0, targetEndKm: 685.0 }
+        ];
+        (DATA.EXPEDITION_ROUTES || []).forEach((exp, expIdx) => {
+          // 柔和发光外套管
+          const glowObj = buildCurveMesh(exp.points, {
+            color: exp.color,
+            emissive: exp.emissive,
+            radius: 0.85,
+            elevOffset: 195,
+            opacity: 0.28,
+            emissiveIntensity: 0.45
+          });
+          routeGroups.expedition.add(glowObj.mesh);
+
+          // 核心高亮三维管道
+          const coreObj = buildCurveMesh(exp.points, {
+            color: exp.color,
+            emissive: exp.emissive,
+            radius: 0.54,
+            elevOffset: 220,
+            emissiveIntensity: 0.60
+          });
+          routeGroups.expedition.add(coreObj.mesh);
+
+          // 沿线方向锥标箭头
+          addDirectionCones(routeGroups.expedition, coreObj.curve, exp.color, exp.emissive, [0.16, 0.40, 0.66, 0.88]);
+
+          // 3D 悬浮考察铭牌（可直接点击飞跃定位该分段）
+          const bw = DEM.latLngToWorld(exp.bannerLatLng[0], exp.bannerLatLng[1], verticalScale, 1180);
+          const card = document.createElement('button');
+          card.type = 'button';
+          card.className = 'exp-banner-card';
+          card.dataset.exp = exp.id;
+          card.innerHTML = `
+            <span class="exp-banner-dot" style="background:${exp.color};"></span>
+            <span>${exp.order}. ${exp.leader}：${exp.routeSpan}</span>
+            <span class="exp-banner-date">${exp.dateLabel}</span>
+          `;
+          card.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof window.focusExpeditionStageExternal === 'function') {
+              window.focusExpeditionStageExternal(exp.id);
+            }
+          });
+          const cardObj = new CSS2DObject(card);
+          cardObj.position.set(bw.x, bw.y, bw.z);
+          routeGroups.expedition.add(cardObj);
+
+          // 插值采集考察全线高精度样本用于 685km 模拟行车与剖面绘制
+          const pts = exp.points;
+          const stagePts = [];
+          let stageRawDist = 0;
+          for (let i = 0; i < pts.length - 1; i++) {
+            const subSteps = 8;
+            for (let s = 0; s < subSteps; s++) {
+              if (i === pts.length - 2 && s === subSteps - 1) break;
+              const t = s / subSteps;
+              const lat = pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t;
+              const lng = pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t;
+              stagePts.push([lat, lng]);
+            }
+          }
+          stagePts.push(pts[pts.length - 1]);
+
+          const cumList = [0];
+          for (let k = 1; k < stagePts.length; k++) {
+            const a = DEM.latLngToWorldXZ(stagePts[k - 1][0], stagePts[k - 1][1]);
+            const b = DEM.latLngToWorldXZ(stagePts[k][0], stagePts[k][1]);
+            stageRawDist += Math.hypot(b.x - a.x, b.z - a.z);
+            cumList.push(stageRawDist);
+          }
+          const bound = expStageBounds[expIdx] || { startKm: 0, targetEndKm: 685.0 };
+          const spanKm = bound.targetEndKm - bound.startKm;
+          stagePts.forEach((pt, idx) => {
+            if (expRawSamples.length > 0 && idx === 0) return;
+            const ratio = stageRawDist > 0 ? cumList[idx] / stageRawDist : 0;
+            const km = bound.startKm + ratio * spanKm;
+            expRawSamples.push({
+              lat: pt[0],
+              lng: pt[1],
+              elev: DEM.sampleElevation(pt[0], pt[1]),
+              km,
+              expId: exp.id,
+              expColor: exp.color,
+              expShort: `${exp.order}. ${exp.leader.replace('路线', '')}(${exp.dateLabel})`
+            });
+          });
+        });
+        expeditionSamples = expRawSamples;
+
+        // 四大考察交接枢纽地面脉冲双环光阵（大理下关 · 保山 · 腾冲 · 畹町）
+        const hubSpecs = [
+          { lat: 25.5860, lng: 100.2240, color: 0xef4444 },
+          { lat: 25.1120, lng: 99.1610,  color: 0xf59e0b },
+          { lat: 25.0205, lng: 98.4972,  color: 0x3b82f6 },
+          { lat: 24.0825, lng: 98.0715,  color: 0x10b981 }
+        ];
+        hubSpecs.forEach((h) => {
+          const hw = DEM.latLngToWorld(h.lat, h.lng, verticalScale, 60);
+          const outerG = new THREE.RingGeometry(1.75, 2.55, 28);
+          outerG.rotateX(-Math.PI / 2);
+          const outerM = new THREE.MeshBasicMaterial({ color: h.color, transparent: true, opacity: 0.72 });
+          const outerMesh = new THREE.Mesh(outerG, outerM);
+          outerMesh.position.set(hw.x, hw.y, hw.z);
+          routeGroups.expedition.add(outerMesh);
+
+          const innerG = new THREE.RingGeometry(0.95, 1.35, 24);
+          innerG.rotateX(-Math.PI / 2);
+          const innerM = new THREE.MeshBasicMaterial({ color: 0xfde68a, transparent: true, opacity: 0.85 });
+          const innerMesh = new THREE.Mesh(innerG, innerM);
+          innerMesh.position.set(hw.x, hw.y + 0.08, hw.z);
+          routeGroups.expedition.add(innerMesh);
+        });
+
+        // 1. 今日路书实际行车线（按三段色彩渲染，并构建大理段 178km 行车采样数组）
+        const rawCombined = [];
+        DATA.MODERN_SEGMENTS.forEach((seg) => {
+          const { mesh } = buildCurveMesh(seg.points, {
+            color: seg.color,
+            radius: 0.24,
+            elevOffset: 90,
+            emissiveIntensity: 0.42
+          });
+          routeGroups.modern.add(mesh);
+
+          seg.points.forEach((pt, idx) => {
+            if (rawCombined.length > 0 && idx === 0) return;
+            rawCombined.push({
+              lat: pt[0],
+              lng: pt[1],
+              surfaceType: pt[2] || 'asphalt',
+              segId: seg.id,
+              segName: seg.name
+            });
+          });
+        });
+
+        // 计算累计公里数与地形采样海拔
+        modernDriveSamples = [];
+        let accKm = 0;
+        for (let i = 0; i < rawCombined.length; i++) {
+          const cur = rawCombined[i];
+          if (i > 0) {
+            const prev = rawCombined[i - 1];
+            const a = DEM.latLngToWorldXZ(prev.lat, prev.lng);
+            const b = DEM.latLngToWorldXZ(cur.lat, cur.lng);
+            accKm += Math.hypot(b.x - a.x, b.z - a.z);
+          }
+          const elev = DEM.sampleElevation(cur.lat, cur.lng);
+          modernDriveSamples.push({
+            ...cur,
+            km: accKm,
+            elev
+          });
+        }
+        // 按原文总程 ~178km 做温和线性归一化标定（山路曲折系数修正）
+        const totalPlanKm = 178.0;
+        const scaleFactor = accKm > 0 ? totalPlanKm / accKm : 1;
+        modernDriveSamples.forEach((s) => {
+          s.km = s.km * scaleFactor;
+        });
+
+        // 2. 1938 历史滇缅公路原线（鎏金琥珀色，微向侧上方偏移以同屏清晰对比）
+        const histObj = buildCurveMesh(DATA.HISTORICAL_MAINLINE, {
+          color: '#fbbf24',
+          emissive: '#d97706',
+          radius: 0.22,
+          elevOffset: 145,
+          emissiveIntensity: 0.45,
+          opacity: 0.9
+        });
+        routeGroups.historical.add(histObj.mesh);
+
+        // 3. 历史水下淹没段 & 战时防空炮台/宝丰移建桥/文物/保腾松山支线
+        DATA.HERITAGE_BRANCHES.forEach((br) => {
+          const { mesh } = buildCurveMesh(br.points, {
+            color: br.color,
+            dashed: true,
+            dashSize: br.submerged ? 0.55 : 0.9,
+            gapSize: 0.45,
+            elevOffset: br.submerged ? 35 : 115,
+            opacity: 0.95
+          });
+          routeGroups.heritage.add(mesh);
+
+          // 额外加一条柔和底带方便看清支线走向
+          const glow = buildCurveMesh(br.points, {
+            color: br.color,
+            radius: 0.14,
+            elevOffset: br.submerged ? 25 : 105,
+            opacity: 0.45,
+            emissiveIntensity: 0.55
+          });
+          routeGroups.heritage.add(glow.mesh);
+        });
+
+        // 4. 纯 GPS 默认误导对比路线（警示玫红色虚线 + 半透明细管）
+        DATA.GPS_TRAP_ROUTES.forEach((trap) => {
+          const { mesh } = buildCurveMesh(trap.points, {
+            color: trap.color,
+            dashed: true,
+            dashSize: 0.95,
+            gapSize: 0.55,
+            elevOffset: 170,
+            opacity: 0.85
+          });
+          routeGroups.traps.add(mesh);
+        });
+      }
+      rebuildAllRoutes();
+
+      // ========== 4. 30 个交互三维节点锚点与悬浮标签 ==========
+      const markerGroup = new THREE.Group();
+      scene.add(markerGroup);
+      const clickableMeshes = [];
+      const waypointObjects = new Map();
+
+      function getTypeColor(type) {
+        if (type === 'gps') return 0x38bdf8;
+        if (type === 'caution') return 0xfb7185;
+        if (type === 'relic') return 0xf59e0b;
+        return 0x2dd4bf;
+      }
+
+      function rebuildWaypoints() {
+        while (markerGroup.children.length) {
+          const obj = markerGroup.children[0];
+          // 清理 CSS2D DOM
+          obj.traverse((child) => {
+            if (child.isCSS2DObject && child.element && child.element.parentNode) {
+              child.element.parentNode.removeChild(child.element);
+            }
+          });
+          markerGroup.remove(obj);
+        }
+        clickableMeshes.length = 0;
+        waypointObjects.clear();
+
+        DATA.WAYPOINTS.forEach((wp) => {
+          const world = DEM.latLngToWorld(wp.lat, wp.lng, verticalScale, 0);
+          const color = wp.isHub ? 0xf59e0b : getTypeColor(wp.type);
+          const root = new THREE.Group();
+          root.position.set(world.x, world.y, world.z);
+
+          // 底座光环
+          const ringGeo = new THREE.RingGeometry(wp.isHub ? 0.75 : 0.45, wp.isHub ? 1.25 : 0.72, 24);
+          ringGeo.rotateX(-Math.PI / 2);
+          const ringMat = new THREE.MeshBasicMaterial({
+            color,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.78
+          });
+          const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+          ringMesh.position.y = 0.12;
+          root.add(ringMesh);
+
+          // 立柱（枢纽与重点加高）
+          const stemH = wp.isHub ? 4.2 : wp.order > 22 ? 3.2 : (wp.type === 'caution' || wp.type === 'relic' ? 2.6 : 2.0);
+          const stemGeo = new THREE.CylinderGeometry(wp.isHub ? 0.14 : 0.08, wp.isHub ? 0.22 : 0.14, stemH, 10);
+          const stemMat = new THREE.MeshStandardMaterial({
+            color,
+            emissive: color,
+            emissiveIntensity: 0.45
+          });
+          const stemMesh = new THREE.Mesh(stemGeo, stemMat);
+          stemMesh.position.y = stemH * 0.5;
+          root.add(stemMesh);
+
+          // 顶部交互晶体（警示用八面棱锥，其余用菱柱/球）
+          const headScale = wp.isHub ? 1.45 : wp.order > 22 ? 1.2 : 1.0;
+          const headGeo =
+            wp.type === 'caution'
+              ? new THREE.OctahedronGeometry(0.46 * headScale, 0)
+              : wp.type === 'relic'
+              ? new THREE.ConeGeometry(0.38 * headScale, 0.78 * headScale, 4)
+              : new THREE.SphereGeometry(0.36 * headScale, 16, 16);
+          const headMat = new THREE.MeshStandardMaterial({
+            color,
+            emissive: color,
+            emissiveIntensity: 0.65,
+            roughness: 0.2,
+            metalness: 0.3
+          });
+          const headMesh = new THREE.Mesh(headGeo, headMat);
+          headMesh.position.y = stemH + 0.42;
+          headMesh.userData = { waypointId: wp.id };
+          root.add(headMesh);
+
+          // 隐形宽容射线拾取球（方便鼠标精确点中）
+          const hitGeo = new THREE.SphereGeometry(1.4, 10, 10);
+          const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+          const hitMesh = new THREE.Mesh(hitGeo, hitMat);
+          hitMesh.position.y = stemH * 0.7;
+          hitMesh.userData = { waypointId: wp.id };
+          root.add(hitMesh);
+          clickableMeshes.push(hitMesh, headMesh);
+
+          // CSS2D 悬浮标签（可直接点击）
+          const labelEl = document.createElement('button');
+          labelEl.type = 'button';
+          labelEl.className = `map-marker-label type-${wp.type}`;
+          labelEl.dataset.wpId = wp.id;
+          labelEl.innerHTML = `<span class="m-idx">${wp.order}</span><span>${wp.shortName}</span><span class="m-elev">${wp.elev}m</span>`;
+          labelEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectWaypoint(wp.id, true);
+          });
+
+          const labelObj = new CSS2DObject(labelEl);
+          labelObj.position.set(0, stemH + 1.05, 0);
+          root.add(labelObj);
+
+          markerGroup.add(root);
+          waypointObjects.set(wp.id, { root, headMesh, ringMesh, labelEl, wp });
+        });
+      }
+      rebuildWaypoints();
+
+      // ========== 5. 三维领航车标（用于 3D 模拟行车与剖面拖拽） ==========
+      const carGroup = new THREE.Group();
+      const carBody = new THREE.Mesh(
+        new THREE.BoxGeometry(1.1, 0.56, 1.9),
+        new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xdc2626, emissiveIntensity: 0.6 })
+      );
+      carBody.position.y = 0.42;
+      carGroup.add(carBody);
+      const carRoof = new THREE.Mesh(
+        new THREE.BoxGeometry(0.84, 0.36, 1.02),
+        new THREE.MeshStandardMaterial({ color: 0xf8fafc, emissive: 0xbae6fd, emissiveIntensity: 0.35 })
+      );
+      carRoof.position.set(0, 0.82, 0.08);
+      carGroup.add(carRoof);
+      const carHalo = new THREE.Mesh(
+        new THREE.RingGeometry(1.2, 1.65, 24),
+        new THREE.MeshBasicMaterial({ color: 0xfca5a5, side: THREE.DoubleSide, transparent: true, opacity: 0.8 })
+      );
+      carHalo.rotation.x = -Math.PI / 2;
+      carHalo.position.y = 0.16;
+      carGroup.add(carHalo);
+      scene.add(carGroup);
+
+      // 指南针方位悬浮标注（苍山洱海 / 保山 / 高黎贡山 / 腾冲 / 畹町）
+      function addCompassHint(lat, lng, text) {
+        const w = DEM.latLngToWorld(lat, lng, verticalScale, 320);
+        const div = document.createElement('div');
+        div.style.cssText =
+          'font-size:11px;font-weight:700;color:rgba(218,236,225,0.72);letter-spacing:0.06em;text-shadow:0 2px 6px #000;pointer-events:none;';
+        div.textContent = text;
+        const obj = new CSS2DObject(div);
+        obj.position.set(w.x, w.y, w.z);
+        scene.add(obj);
+      }
+      addCompassHint(25.74, 100.22, '← 苍山 · 洱海（大理起点）');
+      addCompassHint(25.82, 99.37, '↑ 云龙 · 宝丰乡（北）');
+      addCompassHint(25.24, 98.73, '▲ 高黎贡山主脊（3400m+）');
+      addCompassHint(24.04, 97.98, '↙ 畹町国门终点（入缅甸木姐/腊戍）');
+
+      // ========== 6. 状态管理、左侧目录筛选、节点详情面板与灯箱 ==========
+      let selectedWpId = null;
+      let currentFilter = 'all';
+      let currentTourStage = 'all';
+      let driveScope = 'expedition'; // 'expedition' (685km 三段全线) | 'dali' (178km 大理段精读)
+      let cameraAnim = null;
+
+      const leftDrawer = document.getElementById('left-drawer');
+      const btnOpenLeft = document.getElementById('btn-open-left');
+      const rightDrawer = document.getElementById('right-drawer');
+      const expTourBar = document.getElementById('exp-tour-bar');
+      const wpListEl = document.getElementById('wp-list');
+
+      function syncTourBarPosition() {
+        if (!expTourBar) return;
+        if (window.innerWidth <= 1100) {
+          expTourBar.style.right = '';
+          return;
+        }
+        expTourBar.style.right = rightDrawer.classList.contains('hidden') ? '12px' : '434px';
+      }
+
+      document.getElementById('btn-close-left').addEventListener('click', () => {
+        leftDrawer.classList.add('collapsed');
+        btnOpenLeft.style.display = 'block';
+      });
+      btnOpenLeft.addEventListener('click', () => {
+        leftDrawer.classList.remove('collapsed');
+        btnOpenLeft.style.display = 'none';
+      });
+
+      document.getElementById('btn-close-detail').addEventListener('click', () => {
+        rightDrawer.classList.add('hidden');
+        syncTourBarPosition();
+        selectedWpId = null;
+        syncSelectedStyles();
+      });
+
+      function showToast(msg) {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.classList.add('show');
+        clearTimeout(el._t);
+        el._t = setTimeout(() => el.classList.remove('show'), 2200);
+      }
+
+      function matchesFilter(wp, filter) {
+        if (filter === 'all') return true;
+        if (filter === 'caution') return wp.type === 'caution' || wp.type === 'branch';
+        if (filter === 'dali') return wp.order <= 22;
+        if (filter === 'exp1') return wp.order <= 22 || (wp.expStages || []).includes('exp1');
+        if (filter === 'exp2' || filter === 'exp3') return (wp.expStages || []).includes(filter);
+        return wp.segment === filter;
+      }
+
+      function renderWaypointList() {
+        const list = DATA.WAYPOINTS.filter((wp) => matchesFilter(wp, currentFilter));
+
+        wpListEl.innerHTML = '';
+        list.forEach((wp) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = `wp-item ${wp.id === selectedWpId ? 'active' : ''}`;
+          btn.dataset.wpId = wp.id;
+          btn.innerHTML = `
+            <div class="wp-item-top">
+              <div class="wp-item-name">
+                <span class="wp-num">${wp.order}</span>
+                <span>${wp.name}</span>
+              </div>
+            </div>
+            <div class="wp-meta">
+              <span class="badge badge-${wp.type}">${wp.typeLabel}</span>
+              <span>${wp.elev} m</span>
+              <span>· ${wp.km} km</span>
+              <span>· ${wp.tripDay}</span>
+            </div>
+          `;
+          btn.addEventListener('click', () => {
+            if (window.innerWidth <= 760) {
+              leftDrawer.classList.add('collapsed');
+              btnOpenLeft.style.display = 'block';
+            }
+            selectWaypoint(wp.id, true);
+          });
+          wpListEl.appendChild(btn);
+        });
+      }
+
+      function setLeftFilter(filter) {
+        currentFilter = filter;
+        document.querySelectorAll('.filter-chip').forEach((c) => c.classList.toggle('active', c.dataset.filter === filter));
+        renderWaypointList();
+      }
+
+      document.getElementById('filter-tabs').addEventListener('click', (e) => {
+        const chip = e.target.closest('.filter-chip');
+        if (!chip) return;
+        setLeftFilter(chip.dataset.filter);
+      });
+
+      function syncSelectedStyles() {
+        waypointObjects.forEach((entry, id) => {
+          entry.labelEl.classList.toggle('is-selected', id === selectedWpId);
+        });
+        document.querySelectorAll('.wp-item').forEach((item) => {
+          item.classList.toggle('active', item.dataset.wpId === selectedWpId);
+        });
+      }
+
+      function flyCameraToWaypoint(wp) {
+        const world = DEM.latLngToWorld(wp.lat, wp.lng, verticalScale, 0);
+        const endTarget = new THREE.Vector3(world.x, world.y + 0.8, world.z);
+        // 沿东南侧俯瞰（枢纽节点距离略宽以尽收谷地走势）
+        const dist = wp.isHub || wp.order > 22 ? 22.0 : 11.5;
+        const endPos = new THREE.Vector3(world.x + dist * 0.78, world.y + dist * 0.85, world.z + dist * 1.05);
+        cameraAnim = {
+          startTime: performance.now(),
+          duration: 950,
+          startPos: camera.position.clone(),
+          startTarget: controls.target.clone(),
+          endPos,
+          endTarget
+        };
+      }
+
+      function focusExpeditionStage(stageKey) {
+        currentTourStage = stageKey;
+        document.querySelectorAll('.exp-tour-btn').forEach((b) => {
+          b.classList.toggle('active', b.dataset.exp === stageKey);
+        });
+        followCam = false;
+        const followBtn = document.getElementById('btn-drive-follow');
+        if (followBtn) followBtn.textContent = '视角: 自由';
+
+        // 保证考察路线图层可见
+        if (routeGroups.expedition) {
+          routeGroups.expedition.visible = true;
+          document.querySelectorAll('.pill-btn[data-layer="expedition"]').forEach((b) => b.classList.add('active'));
+        }
+
+        let endTarget, endPos;
+        if (stageKey === 'all') {
+          endTarget = CAM_OVERVIEW.target.clone();
+          endPos = CAM_OVERVIEW.pos.clone();
+          setLeftFilter('all');
+          showToast('已切换至滇缅公路三段实地考察全景（下关 → 保山 → 腾冲 → 畹町）');
+        } else if (stageKey === 'dali') {
+          endTarget = CAM_DALI.target.clone();
+          endPos = CAM_DALI.pos.clone();
+          setLeftFilter('dali');
+          showToast('已聚焦大理段 22 个深度路书节点（下关 → 漾濞 → 永平 → 功果桥）');
+        } else {
+          const exp = (DATA.EXPEDITION_ROUTES || []).find((r) => r.id === stageKey);
+          if (!exp) return;
+          const tWorld = DEM.latLngToWorld(exp.camTargetLatLng[0], exp.camTargetLatLng[1], verticalScale, 0);
+          endTarget = new THREE.Vector3(tWorld.x, tWorld.y + 1.2, tWorld.z);
+          endPos = new THREE.Vector3(
+            tWorld.x + exp.camPosOffset[0],
+            tWorld.y + exp.camPosOffset[1],
+            tWorld.z + exp.camPosOffset[2]
+          );
+          setLeftFilter(stageKey);
+          showToast(`已聚焦：${exp.title}（${exp.dateLabel}）`);
+        }
+
+        cameraAnim = {
+          startTime: performance.now(),
+          duration: 1000,
+          startPos: camera.position.clone(),
+          startTarget: controls.target.clone(),
+          endPos,
+          endTarget
+        };
+      }
+      window.focusExpeditionStageExternal = focusExpeditionStage;
+
+      // 构建 Google Maps 真实坐标卫星页 & 复制导航词
+      function copyText(text, label) {
+        if (navigator.clipboard?.writeText) {
+          navigator.clipboard.writeText(text).then(() => showToast(`已复制${label}：${text}`)).catch(() => {
+            showToast(`${label}：${text}`);
+          });
+        } else {
+          showToast(`${label}：${text}`);
+        }
+      }
+
+      function updateHUD(wp) {
+        document.getElementById('hud-gps-text').textContent = wp.gpsInstruction;
+        document.getElementById('hud-human-text').textContent = wp.humanAttention;
+        document.getElementById('hud-nav-kw').textContent = wp.navKeyword;
+        document.getElementById('hud-gmap-link').href =
+          `https://www.google.com/maps/@${wp.lat},${wp.lng},15z/data=!3m1!1e3`;
+        const copyBtn = document.getElementById('btn-copy-nav');
+        copyBtn.onclick = () => copyText(wp.navKeyword, '导航关键词');
+      }
+
+      // 详情面板与图片灯箱
+      let currentGallery = [];
+      let currentLightboxIndex = 0;
+
+      function renderDetailPanel(wp) {
+        const gcj = DEM.wgs84ToGcj02(wp.lat, wp.lng);
+        document.getElementById('detail-kicker').textContent =
+          `${wp.segmentLabel} · ${wp.tripLabel}`;
+        document.getElementById('detail-title').textContent = `${wp.order}. ${wp.name}`;
+
+        const imagesHtml = (wp.images || [])
+          .map((imgId, idx) => {
+            const cap = DATA.IMAGE_CAPTIONS[imgId] || imgId;
+            return `
+              <button type="button" class="gallery-item" data-lb-idx="${idx}">
+                <img src="${resolveImageSrc(imgId)}" alt="${cap}" loading="lazy" />
+                <div class="gallery-cap">${cap}</div>
+              </button>
+            `;
+          })
+          .join('');
+
+        const body = document.getElementById('detail-body');
+        body.innerHTML = `
+          <div class="stat-grid">
+            <div class="stat-box"><div class="s-k">实测海拔</div><div class="s-v">${wp.elev} m</div></div>
+            <div class="stat-box"><div class="s-k">累计里程</div><div class="s-v">${wp.km} km</div></div>
+            <div class="stat-box"><div class="s-k">节点类型</div><div class="s-v">${wp.typeLabel}</div></div>
+          </div>
+
+          <div class="coord-bar">
+            <span>WGS-84: <b>${wp.lat.toFixed(4)}°N, ${wp.lng.toFixed(4)}°E</b></span>
+            <span>GCJ-02(高德参考): ${gcj.lat.toFixed(4)}°N, ${gcj.lng.toFixed(4)}°E</span>
+          </div>
+
+          <div class="action-row">
+            <button type="button" class="action-btn" id="detail-copy-kw">📋 复制导航锁定词「${wp.navKeyword}」</button>
+            <a class="action-btn gold" href="https://www.google.com/maps/search/?api=1&query=${wp.lat},${wp.lng}" target="_blank" rel="noopener noreferrer">🌍 在 Google Maps 查看实景坐标</a>
+          </div>
+
+          <div class="dual-card gps">
+            <div class="dual-card-title">📡 今日 GPS 怎么用（分段导航与机器逻辑）</div>
+            <p>${wp.gpsInstruction}</p>
+          </div>
+
+          <div class="dual-card human">
+            <div class="dual-card-title">🧠 人脑现场注意点（文章提炼 · 绝不能全信导航）</div>
+            <p>${wp.humanAttention}</p>
+          </div>
+
+          <div class="dual-card history">
+            <div class="dual-card-title">🛣️ 1938 历史原线 × 今日路线对比 · 路面状况</div>
+            <p><b>当前路面：</b>${wp.surface}\n<b>古今对比：</b>${wp.historyVsToday}</p>
+          </div>
+
+          <div>
+            <div class="detail-section-title">📖 抗战史实与实地背景详述</div>
+            <p class="detail-prose">${wp.detail}</p>
+          </div>
+
+          <div>
+            <div class="detail-section-title">🖼️ 原文配图档案（点击放大查看清晰标注）</div>
+            <div class="gallery-grid">${imagesHtml}</div>
+          </div>
+        `;
+
+        document.getElementById('detail-copy-kw').addEventListener('click', () => {
+          copyText(wp.navKeyword, '导航关键词');
+        });
+
+        currentGallery = (wp.images || []).map((id) => ({
+          src: resolveImageSrc(id),
+          caption: DATA.IMAGE_CAPTIONS[id] || id
+        }));
+
+        body.querySelectorAll('.gallery-item').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            openLightbox(Number(btn.dataset.lbIdx));
+          });
+        });
+
+        const idx = DATA.WAYPOINTS.findIndex((w) => w.id === wp.id);
+        document.getElementById('detail-progress').textContent = `${idx + 1} / ${DATA.WAYPOINTS.length}`;
+        document.getElementById('btn-prev-wp').disabled = idx <= 0;
+        document.getElementById('btn-next-wp').disabled = idx >= DATA.WAYPOINTS.length - 1;
+
+        rightDrawer.classList.remove('hidden');
+        syncTourBarPosition();
+        body.scrollTop = 0;
+      }
+
+      function selectWaypoint(wpId, flyCamera) {
+        const wp = DATA.WAYPOINTS.find((w) => w.id === wpId);
+        if (!wp) return;
+        selectedWpId = wp.id;
+        syncSelectedStyles();
+        updateHUD(wp);
+        renderDetailPanel(wp);
+        if (flyCamera) flyCameraToWaypoint(wp);
+
+        // 若该点在主行车线上，同步推进剖面游标（支线节点不强行跳走主线车标）
+        if (wp.segment !== 'branch') {
+          if (wp.order > 22 && driveScope === 'dali') {
+            driveScope = 'expedition';
+            document.getElementById('btn-drive-scope').textContent = '路线: 三段全线(685km)';
+          }
+          const maxKm = driveScope === 'expedition' ? 685.0 : 178.0;
+          const ratio = Math.max(0, Math.min(1, wp.km / maxKm));
+          setDriveProgress(ratio, false);
+        }
+      }
+
+      document.getElementById('btn-prev-wp').addEventListener('click', () => {
+        const idx = DATA.WAYPOINTS.findIndex((w) => w.id === selectedWpId);
+        if (idx > 0) selectWaypoint(DATA.WAYPOINTS[idx - 1].id, true);
+      });
+      document.getElementById('btn-next-wp').addEventListener('click', () => {
+        const idx = DATA.WAYPOINTS.findIndex((w) => w.id === selectedWpId);
+        if (idx >= 0 && idx < DATA.WAYPOINTS.length - 1) selectWaypoint(DATA.WAYPOINTS[idx + 1].id, true);
+      });
+
+      // ========== 7. 3D 射线拾取（点击场景中任意节点立体柱进入详情） ==========
+      const raycaster = new THREE.Raycaster();
+      const pointer = new THREE.Vector2();
+      let pointerDownPos = null;
+
+      renderer.domElement.addEventListener('pointerdown', (e) => {
+        pointerDownPos = { x: e.clientX, y: e.clientY };
+      });
+
+      renderer.domElement.addEventListener('pointerup', (e) => {
+        if (!pointerDownPos) return;
+        const moveDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+        if (moveDist > 12) return; // 拖拽旋转地图时不触发点击
+
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+
+        const hits = raycaster.intersectObjects(clickableMeshes, false);
+        if (hits.length > 0) {
+          const wpId = hits[0].object.userData.waypointId;
+          if (wpId) selectWaypoint(wpId, true);
+        }
+      });
+
+      renderer.domElement.addEventListener('pointermove', (e) => {
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(pointer, camera);
+        const hits = raycaster.intersectObjects(clickableMeshes, false);
+        renderer.domElement.style.cursor = hits.length > 0 ? 'pointer' : 'grab';
+      });
+
+      // ========== 8. 原生 <dialog> 灯箱与宏观史实贴士窗口（兼容低版本降级定位） ==========
+      function openDialogSafe(dlg) {
+        if (!dlg) return;
+        if (typeof dlg.showModal === 'function') {
+          if (!dlg.open) dlg.showModal();
+        } else {
+          dlg.setAttribute('open', '');
+          dlg.classList.add('is-fallback-open');
+        }
+      }
+      function closeDialogSafe(dlg) {
+        if (!dlg) return;
+        if (typeof dlg.close === 'function') {
+          if (dlg.open) dlg.close();
+        } else {
+          dlg.removeAttribute('open');
+          dlg.classList.remove('is-fallback-open');
+        }
+      }
+
+      const lbDialog = document.getElementById('lightbox-dialog');
+      function openLightbox(idx) {
+        if (!currentGallery.length) return;
+        currentLightboxIndex = (idx + currentGallery.length) % currentGallery.length;
+        const item = currentGallery[currentLightboxIndex];
+        document.getElementById('lightbox-img').src = item.src;
+        document.getElementById('lightbox-img').alt = item.caption;
+        document.getElementById('lightbox-caption').textContent = item.caption;
+        document.getElementById('lightbox-title').textContent = `原文高清档案 (${currentLightboxIndex + 1}/${currentGallery.length})`;
+        openDialogSafe(lbDialog);
+      }
+      document.getElementById('btn-close-lightbox').addEventListener('click', () => closeDialogSafe(lbDialog));
+      document.getElementById('btn-lb-prev').addEventListener('click', () => openLightbox(currentLightboxIndex - 1));
+      document.getElementById('btn-lb-next').addEventListener('click', () => openLightbox(currentLightboxIndex + 1));
+      lbDialog.addEventListener('click', (e) => {
+        if (e.target === lbDialog) closeDialogSafe(lbDialog); // light dismiss
+      });
+
+      const macroDialog = document.getElementById('macro-dialog');
+      function renderMacroDialog() {
+        const m = DATA.MACRO_STORY;
+        document.getElementById('macro-dialog-body').innerHTML = `
+          <p style="margin-top:0;color:var(--ink-2);">来源：${m.author} · ${m.publishDate} · <a href="${m.sourceUrl}" target="_blank" rel="noopener noreferrer" style="color:var(--gps);">原文链接</a></p>
+          <div class="macro-stats">
+            ${m.stats
+              .map(
+                (s) => `
+              <div class="macro-card">
+                <div class="m-lbl">${s.label}</div>
+                <div class="m-val">${s.value}</div>
+                <div class="m-sub">${s.sub}</div>
+              </div>
+            `
+              )
+              .join('')}
+          </div>
+          <div class="detail-section-title">📜 抗战生命线核心历史纵览</div>
+          ${m.historySummary.map((p) => `<p class="detail-prose" style="margin-bottom:8px;">${p}</p>`).join('')}
+          <div class="detail-section-title" style="margin-top:14px;">🧭 实地自驾五大贴士（人脑风控指南）</div>
+          <div class="tips-list">
+            ${m.fiveTips
+              .map(
+                (t) => `
+              <div class="tip-box">
+                <strong>${t.title}</strong>
+                <span style="font-size:12px;color:#e5ece8;">${t.desc}</span>
+              </div>
+            `
+              )
+              .join('')}
+          </div>
+        `;
+      }
+      renderMacroDialog();
+      document.getElementById('btn-macro-modal').addEventListener('click', () => openDialogSafe(macroDialog));
+      document.getElementById('btn-close-macro').addEventListener('click', () => closeDialogSafe(macroDialog));
+      macroDialog.addEventListener('click', (e) => {
+        if (e.target === macroDialog) closeDialogSafe(macroDialog);
+      });
+
+      // ========== 9. 底部交互式海拔纵剖面图 & 3D 模拟行车领航 ==========
+      const profCanvas = document.getElementById('elev-profile-canvas');
+      const profCtx = profCanvas.getContext('2d');
+      let driveProgress = 0; // 0..1
+      let isPlaying = false;
+      let driveSpeed = 1;
+      let followCam = false;
+      let lastTriggeredWpId = null;
+
+      function sampleActiveTrackAt(progress) {
+        const samples = driveScope === 'expedition' ? expeditionSamples : modernDriveSamples;
+        if (!samples.length) return null;
+        const maxKm = samples[samples.length - 1].km;
+        const targetKm = Math.max(0, Math.min(maxKm, progress * maxKm));
+        for (let i = 0; i < samples.length - 1; i++) {
+          const a = samples[i];
+          const b = samples[i + 1];
+          if (targetKm >= a.km && targetKm <= b.km) {
+            const span = b.km - a.km;
+            const t = span > 1e-6 ? (targetKm - a.km) / span : 0;
+            const lat = a.lat + (b.lat - a.lat) * t;
+            const lng = a.lng + (b.lng - a.lng) * t;
+            const elev = a.elev + (b.elev - a.elev) * t;
+            return {
+              lat,
+              lng,
+              elev,
+              km: targetKm,
+              surfaceType: a.surfaceType,
+              expId: a.expId,
+              expColor: a.expColor,
+              expShort: a.expShort,
+              nextLat: b.lat,
+              nextLng: b.lng
+            };
+          }
+        }
+        const last = samples[samples.length - 1];
+        return { ...last, nextLat: last.lat, nextLng: last.lng };
+      }
+
+      function drawElevationProfile() {
+        const samples = driveScope === 'expedition' ? expeditionSamples : modernDriveSamples;
+        if (!samples.length) return;
+
+        const rect = profCanvas.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const w = Math.max(200, Math.floor(rect.width * dpr));
+        const h = Math.max(48, Math.floor(rect.height * dpr));
+        if (profCanvas.width !== w || profCanvas.height !== h) {
+          profCanvas.width = w;
+          profCanvas.height = h;
+        }
+        const ctx = profCtx;
+        ctx.clearRect(0, 0, w, h);
+
+        const padX = 12 * dpr;
+        const padTop = 10 * dpr;
+        const padBot = 14 * dpr;
+        const plotW = w - padX * 2;
+        const plotH = h - padTop - padBot;
+
+        const isExp = driveScope === 'expedition';
+        const minE = isExp ? 620 : 1200;
+        const maxE = isExp ? 2700 : 2600;
+        const maxKm = samples[samples.length - 1]?.km || (isExp ? 685.0 : 178.0);
+
+        const kmToX = (km) => padX + (km / maxKm) * plotW;
+        const elevToY = (e) => padTop + (1 - (e - minE) / (maxE - minE)) * plotH;
+
+        // 海拔渐变填充
+        const grad = ctx.createLinearGradient(0, padTop, 0, h - padBot);
+        grad.addColorStop(0, 'rgba(245, 158, 11, 0.45)');
+        grad.addColorStop(0.5, 'rgba(59, 130, 246, 0.28)');
+        grad.addColorStop(1, 'rgba(16, 185, 129, 0.14)');
+
+        ctx.beginPath();
+        samples.forEach((s, i) => {
+          const x = kmToX(s.km);
+          const y = elevToY(s.elev);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.lineTo(kmToX(maxKm), h - padBot);
+        ctx.lineTo(kmToX(0), h - padBot);
+        ctx.closePath();
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        const surfColors = {
+          asphalt: '#22c55e',
+          cobble: '#f59e0b',
+          dirt: '#fb923c',
+          steep: '#fb7185'
+        };
+        ctx.lineWidth = (isExp ? 2.2 : 2.0) * dpr;
+        for (let i = 0; i < samples.length - 1; i++) {
+          const a = samples[i];
+          const b = samples[i + 1];
+          ctx.strokeStyle = isExp ? (a.expColor || '#ef4444') : (surfColors[a.surfaceType] || '#22c55e');
+          ctx.beginPath();
+          ctx.moveTo(kmToX(a.km), elevToY(a.elev));
+          ctx.lineTo(kmToX(b.km), elevToY(b.elev));
+          ctx.stroke();
+        }
+
+        // 标出节点圆点
+        DATA.WAYPOINTS.forEach((wp) => {
+          if (wp.segment === 'branch') return;
+          if (!isExp && wp.order > 22) return;
+          const x = kmToX(wp.km);
+          const y = elevToY(wp.elev);
+          ctx.fillStyle =
+            wp.id === selectedWpId
+              ? '#ffffff'
+              : wp.isHub
+                ? '#fde047'
+                : wp.type === 'caution'
+                  ? '#fb7185'
+                  : '#fcd34d';
+          ctx.beginPath();
+          ctx.arc(x, y, (wp.id === selectedWpId ? 4.0 : wp.isHub ? 3.4 : 2.2) * dpr, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        // 地形关键极值/枢纽文字标注
+        ctx.font = `${9.5 * dpr}px sans-serif`;
+        if (isExp) {
+          ctx.fillStyle = 'rgba(253, 230, 138, 0.88)';
+          ctx.fillText('铁丝窝2505m', kmToX(95) - 22 * dpr, elevToY(2505) - 4 * dpr);
+          ctx.fillText('保山1655m', kmToX(262) - 20 * dpr, elevToY(1655) - 5 * dpr);
+          ctx.fillText('高黎贡2310m', kmToX(350) - 22 * dpr, elevToY(2310) - 4 * dpr);
+          ctx.fillText('腾冲1640m', kmToX(412) - 20 * dpr, elevToY(1640) - 5 * dpr);
+          ctx.fillStyle = 'rgba(186, 230, 253, 0.84)';
+          ctx.fillText('双虹桥730m', kmToX(315) - 22 * dpr, h - 3 * dpr);
+          ctx.fillText('畹町780m', kmToX(685) - 42 * dpr, h - 3 * dpr);
+        } else {
+          ctx.fillStyle = 'rgba(253, 230, 138, 0.88)';
+          ctx.fillText('铁丝窝2505m', kmToX(95) - 22 * dpr, elevToY(2505) - 4 * dpr);
+          ctx.fillText('麦庄2400m', kmToX(136.2) - 20 * dpr, elevToY(2400) - 4 * dpr);
+          ctx.fillStyle = 'rgba(186, 230, 253, 0.82)';
+          ctx.fillText('功果桥1275m', kmToX(170) - 34 * dpr, h - 3 * dpr);
+        }
+
+        // 当前车标位置竖线
+        const curX = padX + driveProgress * plotW;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.6 * dpr;
+        ctx.beginPath();
+        ctx.moveTo(curX, 2 * dpr);
+        ctx.lineTo(curX, h - 2 * dpr);
+        ctx.stroke();
+      }
+
+      function setDriveProgress(ratio, syncNearestWp) {
+        driveProgress = Math.max(0, Math.min(1, ratio));
+        const sample = sampleActiveTrackAt(driveProgress);
+        if (!sample) return;
+
+        const elevOffset = driveScope === 'expedition' ? 160 : 120;
+        const world = DEM.latLngToWorld(sample.lat, sample.lng, verticalScale, elevOffset);
+        carGroup.position.set(world.x, world.y, world.z);
+        if (sample.nextLat !== sample.lat || sample.nextLng !== sample.lng) {
+          const nextW = DEM.latLngToWorld(sample.nextLat, sample.nextLng, verticalScale, elevOffset);
+          carGroup.lookAt(nextW.x, nextW.y, nextW.z);
+        }
+
+        if (driveScope === 'expedition') {
+          const c = sample.expColor || '#ef4444';
+          carBody.material.color.set(c);
+          carBody.material.emissive.set(c);
+          carHalo.material.color.set(c);
+          document.getElementById('readout-km').textContent = `${sample.km.toFixed(1)} / 685.0 km`;
+          document.getElementById('readout-elev').textContent = `海拔 ${Math.round(sample.elev)} m · ${sample.expShort || '考察路线'}`;
+        } else {
+          carBody.material.color.set(0x22c55e);
+          carBody.material.emissive.set(0x16a34a);
+          carHalo.material.color.set(0x86efac);
+          const surfTag = {
+            asphalt: 'G320/硬化路',
+            cobble: '弹石老路',
+            dirt: '山区土路',
+            steep: '窄路陡弯警戒'
+          }[sample.surfaceType] || '路书路线';
+          document.getElementById('readout-km').textContent = `${sample.km.toFixed(1)} / 178.0 km`;
+          document.getElementById('readout-elev').textContent = `海拔 ${Math.round(sample.elev)} m · ${surfTag}`;
+        }
+
+        // 自动触发最接近节点的人机双核领航提示
+        if (syncNearestWp) {
+          let nearest = null;
+          let minD = 999;
+          DATA.WAYPOINTS.forEach((wp) => {
+            if (wp.segment === 'branch') return;
+            if (driveScope === 'dali' && wp.order > 22) return;
+            const d = Math.abs(wp.km - sample.km);
+            if (d < minD) {
+              minD = d;
+              nearest = wp;
+            }
+          });
+          const triggerRadius = driveScope === 'expedition' ? 8.0 : 4.5;
+          if (nearest && minD < triggerRadius && nearest.id !== lastTriggeredWpId) {
+            lastTriggeredWpId = nearest.id;
+            updateHUD(nearest);
+            selectedWpId = nearest.id;
+            syncSelectedStyles();
+          }
+        }
+
+        if (followCam && isPlaying) {
+          const offset = driveScope === 'expedition' ? new THREE.Vector3(8.5, 11.5, 13.0) : new THREE.Vector3(4.5, 6.2, 6.8);
+          camera.position.lerp(new THREE.Vector3(world.x + offset.x, world.y + offset.y, world.z + offset.z), 0.14);
+          controls.target.lerp(new THREE.Vector3(world.x, world.y + 0.5, world.z), 0.2);
+        }
+
+        drawElevationProfile();
+      }
+
+      // 剖面条点击/拖拽定位
+      let scrubbing = false;
+      function scrubFromEvent(e) {
+        const rect = profCanvas.getBoundingClientRect();
+        const pad = 12;
+        const ratio = (e.clientX - rect.left - pad) / Math.max(10, rect.width - pad * 2);
+        setDriveProgress(ratio, true);
+      }
+      profCanvas.addEventListener('pointerdown', (e) => {
+        scrubbing = true;
+        scrubFromEvent(e);
+      });
+      window.addEventListener('pointermove', (e) => {
+        if (scrubbing) scrubFromEvent(e);
+      });
+      window.addEventListener('pointerup', () => {
+        scrubbing = false;
+      });
+
+      const playBtn = document.getElementById('btn-drive-play');
+      const scopeBtn = document.getElementById('btn-drive-scope');
+      const speedBtn = document.getElementById('btn-drive-speed');
+      const followBtn = document.getElementById('btn-drive-follow');
+
+      playBtn.addEventListener('click', () => {
+        isPlaying = !isPlaying;
+        if (isPlaying && driveProgress >= 0.995) driveProgress = 0;
+        playBtn.classList.toggle('is-playing', isPlaying);
+        playBtn.textContent = isPlaying ? '⏸ 暂停领航' : '▶ 3D 模拟行车';
+        if (isPlaying) followCam = true;
+        followBtn.textContent = followCam ? '视角: 跟随车标' : '视角: 自由';
+      });
+
+      scopeBtn.addEventListener('click', () => {
+        driveScope = driveScope === 'expedition' ? 'dali' : 'expedition';
+        scopeBtn.textContent = driveScope === 'expedition' ? '路线: 三段全线(685km)' : '路线: 大理段(178km)';
+        lastTriggeredWpId = null;
+        setDriveProgress(0, false);
+      });
+
+      speedBtn.addEventListener('click', () => {
+        driveSpeed = driveSpeed === 1 ? 2 : driveSpeed === 2 ? 4 : 1;
+        speedBtn.textContent = `${driveSpeed}x`;
+      });
+
+      followBtn.addEventListener('click', () => {
+        followCam = !followCam;
+        followBtn.textContent = followCam ? '视角: 跟随车标' : '视角: 自由';
+      });
+
+      // 右上角「实地考察三段沙盘导览」快捷按钮
+      document.getElementById('btn-exp-all')?.addEventListener('click', () => focusExpeditionStage('all'));
+      document.getElementById('btn-exp-1')?.addEventListener('click', () => focusExpeditionStage('exp1'));
+      document.getElementById('btn-exp-2')?.addEventListener('click', () => focusExpeditionStage('exp2'));
+      document.getElementById('btn-exp-3')?.addEventListener('click', () => focusExpeditionStage('exp3'));
+      document.getElementById('btn-exp-dali')?.addEventListener('click', () => focusExpeditionStage('dali'));
+
+      // ========== 10. 顶部控制栏交互 ==========
+      document.querySelectorAll('.pill-btn[data-layer]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const layer = btn.dataset.layer;
+          const active = btn.classList.toggle('active');
+          if (routeGroups[layer]) {
+            routeGroups[layer].visible = active;
+          }
+        });
+      });
+
+      document.getElementById('basemap-select').addEventListener('change', (e) => {
+        applyBasemap(e.target.value);
+      });
+
+      document.getElementById('elev-scale').addEventListener('input', (e) => {
+        verticalScale = parseFloat(e.target.value);
+        document.getElementById('elev-scale-val').textContent = `${verticalScale.toFixed(1)}x`;
+        updateTerrainVertices();
+        buildReservoirWater();
+        rebuildAllRoutes();
+        rebuildWaypoints();
+        syncSelectedStyles();
+        setDriveProgress(driveProgress, false);
+      });
+
+      document.getElementById('btn-reset-cam').addEventListener('click', () => {
+        focusExpeditionStage('all');
+      });
+
+      // ========== 12. 动画主循环与初始化 ==========
+      renderWaypointList();
+      selectWaypoint('P01', false);
+      // 首次加载关闭右侧详情让用户先看清全景沙盘，同时保留左下角列表和双核HUD，点击任意点立即展开！
+      rightDrawer.classList.add('hidden');
+      if (window.innerWidth <= 760) {
+        leftDrawer.classList.add('collapsed');
+        btnOpenLeft.style.display = 'block';
+      }
+      syncTourBarPosition();
+      setDriveProgress(0, false);
+
+      let prevTime = performance.now();
+      function animate(now) {
+        requestAnimationFrame(animate);
+        const dt = Math.min(0.08, (now - prevTime) / 1000);
+        prevTime = now;
+
+        // 相机平滑飞跃插值
+        if (cameraAnim) {
+          const elapsed = now - cameraAnim.startTime;
+          const t = Math.min(1, elapsed / cameraAnim.duration);
+          const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+          camera.position.lerpVectors(cameraAnim.startPos, cameraAnim.endPos, ease);
+          controls.target.lerpVectors(cameraAnim.startTarget, cameraAnim.endTarget, ease);
+          if (t >= 1) cameraAnim = null;
+        }
+
+        // 模拟行车推进
+        if (isPlaying && !scrubbing) {
+          const speedFactor = driveScope === 'expedition' ? 0.014 : 0.025;
+          const nextRatio = driveProgress + dt * speedFactor * driveSpeed;
+          if (nextRatio >= 1) {
+            setDriveProgress(1, true);
+            isPlaying = false;
+            playBtn.classList.remove('is-playing');
+            playBtn.textContent = '▶ 3D 模拟行车';
+            showToast(
+              driveScope === 'expedition'
+                ? '已抵达第三段终点畹町桥（中国境内959.4km国门）！'
+                : '已抵达大理段终点坡脚（云保界），欢迎继续向保山、腾冲、畹町延伸探索！'
+            );
+          } else {
+            setDriveProgress(nextRatio, true);
+          }
+        }
+
+        // 3D 节点晶体微旋转、选中脉冲光环与缩放自适应 LOD
+        waypointObjects.forEach((entry, id) => {
+          entry.headMesh.rotation.y += dt * 1.1;
+          const isSel = id === selectedWpId;
+          const pulse = isSel ? 1.35 + Math.sin(now * 0.006) * 0.28 : 1.0;
+          entry.ringMesh.scale.set(pulse, pulse, 1);
+          entry.headMesh.scale.setScalar(isSel ? 1.35 : 1.0);
+
+          const dist = camera.position.distanceTo(entry.root.position);
+          const hideLod = dist > 110 && entry.wp.order <= 22 && id !== 'P01' && id !== 'P22' && id !== selectedWpId;
+          entry.labelEl.classList.toggle('is-lod-hidden', hideLod);
+        });
+
+        controls.update();
+        renderer.render(scene, camera);
+        labelRenderer.render(scene, camera);
+      }
+      requestAnimationFrame(animate);
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        syncTourBarPosition();
+        drawElevationProfile();
+        if (window.layoutPrologueFrameExternal) window.layoutPrologueFrameExternal();
+      });
+      })();
+    </script>
+  </body>
+</html>
